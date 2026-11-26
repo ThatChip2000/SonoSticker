@@ -10,8 +10,8 @@ Puedes descargar cualquiera de las dos versiones en la sección de [Releases](ht
 
 | Versión | Qué incluye | Cómo se usa | Ideal si... |
 | :--- | :--- | :--- | :--- |
-| **Portable** (`SonoSticker-v1.0.1-Windows-Portable.zip`) | Código + `node.exe` portable + `node_modules` + `ffmpeg.exe` (~85 MB) | Descomprimir y hacer doble clic en `Abrir SonoSticker.bat` | No quieres instalar Node.js ni nada en Windows, ni usar permisos de Administrador |
-| **Ligera / No portable** (`SonoSticker-v1.0.1-Windows-Ligero.zip` o clonar el repo) | Solo el código fuente (~60 KB) | Doble clic en `Abrir SonoSticker.bat` (pregunta si deseas instalar Node.js LTS si falta e instala dependencias la primera vez) | Ya tienes Node.js 20+ o prefieres la descarga mínima |
+| **Portable** (`SonoSticker-v1.0.2-Windows-Portable.zip`) | Código + `node.exe` portable + `node_modules` + `ffmpeg.exe` (~85 MB) | Descomprimir y hacer doble clic en `Abrir SonoSticker.bat` | No quieres instalar Node.js ni nada en Windows, ni usar permisos de Administrador |
+| **Ligera / No portable** (`SonoSticker-v1.0.2-Windows-Ligero.zip` o clonar el repo) | Solo el código fuente (~60 KB) | Doble clic en `Abrir SonoSticker.bat` (pregunta si deseas instalar Node.js LTS si falta e instala dependencias la primera vez) | Ya tienes Node.js 20+ o prefieres la descarga mínima |
 
 ---
 
@@ -31,12 +31,12 @@ Puedes descargar cualquiera de las dos versiones en la sección de [Releases](ht
 ## Inicio rápido
 
 ### Windows (Versión Portable)
-1. Descarga `SonoSticker-v1.0.1-Windows-Portable.zip` desde [Releases](https://github.com/ThatChip2000/SonoSticker/releases/latest) y descomprime la carpeta.
+1. Descarga `SonoSticker-v1.0.2-Windows-Portable.zip` desde [Releases](https://github.com/ThatChip2000/SonoSticker/releases/latest) y descomprime la carpeta.
 2. Haz doble clic en **`Abrir SonoSticker.bat`**.
 3. Se abrirá `http://localhost:3000` automáticamente sin instalar nada en tu PC.
 
 ### Windows (Versión Ligera / No portable)
-1. Descarga `SonoSticker-v1.0.1-Windows-Ligero.zip` (o clona este repositorio).
+1. Descarga `SonoSticker-v1.0.2-Windows-Ligero.zip` (o clona este repositorio).
 2. Haz doble clic en **`Abrir SonoSticker.bat`**.
 3. Si no tienes Node.js 20+, te preguntará (`S/N`) si deseas instalar Node.js LTS automáticamente; la primera vez descargará las dependencias (`npm install`) y abrirá `http://localhost:3000`.
 

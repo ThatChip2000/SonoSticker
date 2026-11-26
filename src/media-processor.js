@@ -8,6 +8,7 @@ const execFileAsync = promisify(execFile);
 
 export const ANIMATED_LIMIT_BYTES = 500 * 1024;
 export const STATIC_LIMIT_BYTES = 100 * 1024;
+export const AUDIO_SAFE_LIMIT_BYTES = 64 * 1024;
 
 function clamp(val, min, max, fallback) {
   const num = Number(val);
@@ -46,7 +47,7 @@ function buildSquareScaleFilter(fitMode, fps = null) {
 }
 
 /**
- * Inspects a media file via FFmpeg stderr output to extract duration and audio/video presence.
+ * Inspects a media file via FFmpeg stderr output to extract duration, start PTS, and streams.
  */
 export async function probeMedia(filePath) {
   if (!ffmpegPath) {
@@ -71,10 +72,85 @@ export async function probeMedia(filePath) {
     durationSec = Number((hours * 3600 + mins * 60 + secs).toFixed(2));
   }
 
+  const startMatch = output.match(/start:\s*([-0-9.]+)/);
+  const startSec = startMatch ? Number(startMatch[1]) : null;
+
   const hasVideo = /Stream #\d+:\d+.*Video:/i.test(output);
   const hasAudio = /Stream #\d+:\d+.*Audio:/i.test(output);
 
-  return { durationSec, hasVideo, hasAudio };
+  return { durationSec, startSec, hasVideo, hasAudio };
+}
+
+/**
+ * Extracts and normalizes audio to a clean WhatsApp-compatible Ogg/Opus mono stream
+ * with zeroed PTS timestamps and stripped container metadata.
+ */
+async function encodeNormalizedOpusAudio(
+  inputPath,
+  audioPath,
+  { startSec, durationSec, audioBitrateKbps, audioVolume, autoFitLimit }
+) {
+  let bitrate = audioBitrateKbps;
+
+  const encode = async (targetBitrate) => {
+    await runFfmpeg([
+      '-y',
+      '-ss',
+      String(startSec),
+      '-i',
+      inputPath,
+      '-t',
+      String(durationSec),
+      '-map',
+      '0:a:0',
+      '-vn',
+      '-sn',
+      '-dn',
+      '-map_metadata',
+      '-1',
+      '-map_chapters',
+      '-1',
+      '-af',
+      `aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS,volume=${audioVolume}`,
+      '-c:a',
+      'libopus',
+      '-application',
+      'voip',
+      '-vbr',
+      'on',
+      '-ar',
+      '24000',
+      '-ac',
+      '1',
+      '-b:a',
+      `${targetBitrate}k`,
+      '-f',
+      'ogg',
+      audioPath,
+    ]);
+    return fs.stat(audioPath);
+  };
+
+  let audioStat = await encode(bitrate);
+
+  if (autoFitLimit && audioStat.size > AUDIO_SAFE_LIMIT_BYTES) {
+    for (let attempt = 0; attempt < 3 && audioStat.size > AUDIO_SAFE_LIMIT_BYTES; attempt++) {
+      bitrate = Math.max(12, bitrate - 12);
+      audioStat = await encode(bitrate);
+    }
+  }
+
+  if (audioStat.size < 256) {
+    throw new Error('No se pudo extraer una pista de audio válida para el tramo seleccionado.');
+  }
+
+  const audioProbe = await probeMedia(audioPath);
+  return {
+    audioSizeBytes: audioStat.size,
+    durationSec: audioProbe.durationSec ?? durationSec,
+    startSec: audioProbe.startSec,
+    appliedAudioBitrateKbps: bitrate,
+  };
 }
 
 /**
@@ -123,11 +199,21 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
       '-y',
       '-ss',
       String(startSec),
-      '-t',
-      String(durationSec),
       '-i',
       inputPath,
+      '-t',
+      String(durationSec),
+      '-map',
+      '0:v:0',
       '-an',
+      '-sn',
+      '-dn',
+      '-map_metadata',
+      '-1',
+      '-map_chapters',
+      '-1',
+      '-fps_mode',
+      'cfr',
       '-vf',
       vf,
       '-c:v',
@@ -158,45 +244,27 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
     }
   }
 
-  await runFfmpeg([
-    '-y',
-    '-ss',
-    String(startSec),
-    '-t',
-    String(durationSec),
-    '-i',
-    inputPath,
-    '-vn',
-    '-af',
-    `volume=${audioVolume}`,
-    '-c:a',
-    'libopus',
-    '-ar',
-    '48000',
-    '-ac',
-    '1',
-    '-b:a',
-    `${audioBitrateKbps}k`,
-    audioPath,
-  ]);
-
-  const audioStat = await fs.stat(audioPath);
-  const audioProbe = await probeMedia(audioPath);
-  const actualDuration = audioProbe.durationSec ?? durationSec;
+  const audioResult = await encodeNormalizedOpusAudio(inputPath, audioPath, {
+    startSec,
+    durationSec,
+    audioBitrateKbps,
+    audioVolume,
+    autoFitLimit,
+  });
 
   return {
     webpPath,
     audioPath,
     webpSizeBytes,
-    audioSizeBytes: audioStat.size,
-    durationSec: actualDuration,
+    audioSizeBytes: audioResult.audioSizeBytes,
+    durationSec: audioResult.durationSec,
     isAnimated: true,
     limitBytes: ANIMATED_LIMIT_BYTES,
     withinLimit: webpSizeBytes < ANIMATED_LIMIT_BYTES,
     appliedSettings: {
       fps,
       webpQuality,
-      audioBitrateKbps,
+      audioBitrateKbps: audioResult.appliedAudioBitrateKbps,
       fitMode,
     },
   };
@@ -242,6 +310,10 @@ export async function processImageAudioToSoundSticker(imagePath, audioSourcePath
       '-y',
       '-i',
       imagePath,
+      '-map',
+      '0:v:0',
+      '-map_metadata',
+      '-1',
       '-vframes',
       '1',
       '-vf',
@@ -269,44 +341,26 @@ export async function processImageAudioToSoundSticker(imagePath, audioSourcePath
     }
   }
 
-  await runFfmpeg([
-    '-y',
-    '-ss',
-    String(audioStartSec),
-    '-t',
-    String(audioDurationSec),
-    '-i',
-    audioSourcePath,
-    '-vn',
-    '-af',
-    `volume=${audioVolume}`,
-    '-c:a',
-    'libopus',
-    '-ar',
-    '48000',
-    '-ac',
-    '1',
-    '-b:a',
-    `${audioBitrateKbps}k`,
-    audioPath,
-  ]);
-
-  const audioStat = await fs.stat(audioPath);
-  const audioProbe = await probeMedia(audioPath);
-  const actualDuration = audioProbe.durationSec ?? audioDurationSec;
+  const audioResult = await encodeNormalizedOpusAudio(audioSourcePath, audioPath, {
+    startSec: audioStartSec,
+    durationSec: audioDurationSec,
+    audioBitrateKbps,
+    audioVolume,
+    autoFitLimit,
+  });
 
   return {
     webpPath,
     audioPath,
     webpSizeBytes,
-    audioSizeBytes: audioStat.size,
-    durationSec: actualDuration,
+    audioSizeBytes: audioResult.audioSizeBytes,
+    durationSec: audioResult.durationSec,
     isAnimated: false,
     limitBytes: STATIC_LIMIT_BYTES,
     withinLimit: webpSizeBytes < STATIC_LIMIT_BYTES,
     appliedSettings: {
       webpQuality,
-      audioBitrateKbps,
+      audioBitrateKbps: audioResult.appliedAudioBitrateKbps,
       fitMode,
     },
   };
