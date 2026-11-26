@@ -7,7 +7,16 @@ call :find_node
 if defined NODE_FOUND goto node_ready
 
 echo.
-echo [INFO] Node.js no esta instalado en tu PC. Se instalara Node.js LTS automaticamente...
+echo [AVISO] No se encontro Node.js ^(20+^) instalado en tu PC.
+echo Es necesario para ejecutar SonoSticker.
+echo.
+choice /c SN /m "Deseas instalar Node.js LTS automaticamente ahora?"
+if errorlevel 2 (
+  echo.
+  echo Instalacion cancelada. Puedes descargarlo manualmente en: https://nodejs.org/
+  pause
+  exit /b 1
+)
 echo.
 
 where winget >nul 2>nul
