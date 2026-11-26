@@ -6,7 +6,7 @@ App web local para crear, recortar, comprimir y enviar **Stickers con Audio (Sou
 
 ## Descarga (Releases)
 
-Puedes descargar cualquiera de las dos versiones en la sección de [Releases](https://github.com/ThatChip2000/sonosticker/releases/latest):
+Puedes descargar cualquiera de las dos versiones en la sección de [Releases](https://github.com/ThatChip2000/SonoSticker/releases/latest):
 
 | Versión | Qué incluye | Cómo se usa | Ideal si... |
 | :--- | :--- | :--- | :--- |
@@ -31,7 +31,7 @@ Puedes descargar cualquiera de las dos versiones en la sección de [Releases](ht
 ## Inicio rápido
 
 ### Windows (Versión Portable)
-1. Descarga `SonoSticker-v1.0.1-Windows-Portable.zip` desde [Releases](https://github.com/ThatChip2000/sonosticker/releases/latest) y descomprime la carpeta.
+1. Descarga `SonoSticker-v1.0.1-Windows-Portable.zip` desde [Releases](https://github.com/ThatChip2000/SonoSticker/releases/latest) y descomprime la carpeta.
 2. Haz doble clic en **`Abrir SonoSticker.bat`**.
 3. Se abrirá `http://localhost:3000` automáticamente sin instalar nada en tu PC.
 
