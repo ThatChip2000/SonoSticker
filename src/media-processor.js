@@ -94,6 +94,11 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
   await fs.mkdir(outputDir, { recursive: true });
 
   const startSec = clamp(options.startSec, 0, 36000, 0);
+  if (probe.durationSec != null && startSec >= probe.durationSec - 0.1) {
+    throw new Error(
+      `El segundo de inicio (${startSec}s) supera la duración del video (${probe.durationSec}s).`
+    );
+  }
   let durationSec = clamp(options.durationSec, 0.5, 10, 5);
   if (probe.durationSec != null && probe.durationSec > startSec + 0.2) {
     const remaining = Number((probe.durationSec - startSec).toFixed(2));
@@ -211,6 +216,11 @@ export async function processImageAudioToSoundSticker(imagePath, audioSourcePath
   const fitMode = options.fitMode === 'cover' ? 'cover' : 'contain';
   let webpQuality = Math.round(clamp(options.webpQuality, 10, 95, 75));
   const audioStartSec = clamp(options.audioStartSec, 0, 36000, 0);
+  if (audioProbeInput.durationSec != null && audioStartSec >= audioProbeInput.durationSec - 0.1) {
+    throw new Error(
+      `El segundo de inicio (${audioStartSec}s) supera la duración del audio (${audioProbeInput.durationSec}s).`
+    );
+  }
   let audioDurationSec = clamp(options.audioDurationSec, 0.5, 10, 5);
   if (audioProbeInput.durationSec != null && audioProbeInput.durationSec > audioStartSec + 0.2) {
     const remaining = Number((audioProbeInput.durationSec - audioStartSec).toFixed(2));

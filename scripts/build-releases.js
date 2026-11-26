@@ -170,11 +170,17 @@ async function main() {
   await fs.copyFile(extractedNodeExe, path.join(portableRuntimeDir, 'node.exe'));
 
   console.log('[INFO] Instalando dependencias limpias (npm ci --omit=dev) para version portable...');
-  execFileSync('npm', ['ci', '--omit=dev'], {
-    cwd: portableStaging,
-    shell: true,
-    stdio: 'inherit',
-  });
+  if (process.platform === 'win32') {
+    execFileSync('cmd.exe', ['/c', 'npm', 'ci', '--omit=dev'], {
+      cwd: portableStaging,
+      stdio: 'inherit',
+    });
+  } else {
+    execFileSync('npm', ['ci', '--omit=dev'], {
+      cwd: portableStaging,
+      stdio: 'inherit',
+    });
+  }
 
   await smokeTestPortable(portableStaging);
 

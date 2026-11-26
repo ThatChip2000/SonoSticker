@@ -109,7 +109,18 @@ class WhatsAppService {
 
           if (isLoggedOut) {
             this.state.user = null;
-            this.state.lastError = 'Sesión cerrada desde el teléfono. Vuelve a vincular con el QR.';
+            await fs.rm(authDir, { recursive: true, force: true }).catch(() => {});
+            if (!this.manualLogout) {
+              this.state.lastError = 'Sesión cerrada desde el teléfono. Generando nuevo QR...';
+              clearTimeout(this.reconnectTimer);
+              this.reconnectTimer = setTimeout(() => {
+                this.start().catch((err) => {
+                  this.state.lastError = err.message;
+                });
+              }, 1500);
+            } else {
+              this.state.lastError = 'Sesión cerrada.';
+            }
             return;
           }
 

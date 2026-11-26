@@ -31,6 +31,20 @@ function formatKB(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
+async function parseJsonResponse(res, fallbackMsg) {
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(res.ok ? 'Respuesta inválida del servidor.' : `${fallbackMsg} (HTTP ${res.status})`);
+  }
+  if (!res.ok) {
+    throw new Error(data?.error || fallbackMsg);
+  }
+  return data;
+}
+
 function setupDropzone(zoneEl, inputEl, onFile) {
   zoneEl.addEventListener('click', () => inputEl.click());
   zoneEl.addEventListener('keydown', (e) => {
@@ -225,8 +239,7 @@ function setupVideoTab() {
       formData.append('autoFitLimit', String($('videoAutoFit').checked));
 
       const res = await fetch('/api/preview/video', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo procesar el video.');
+      const data = await parseJsonResponse(res, 'No se pudo procesar el video.');
 
       renderGeneratedPreview(data);
       showToast('Vista previa generada.');
@@ -331,8 +344,7 @@ function setupImageAudioTab() {
       formData.append('autoFitLimit', String($('staticAutoFit').checked));
 
       const res = await fetch('/api/preview/image-audio', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo procesar imagen y audio.');
+      const data = await parseJsonResponse(res, 'No se pudo procesar imagen y audio.');
 
       renderGeneratedPreview(data);
       showToast('Vista previa generada.');
@@ -375,9 +387,16 @@ function renderGeneratedPreview(data) {
   if (s.fps) parts.push(`FPS: ${s.fps}`);
   if (s.webpQuality) parts.push(`Calidad WebP: ${s.webpQuality}%`);
   if (s.audioBitrateKbps) parts.push(`Audio: ${s.audioBitrateKbps} kbps`);
-  if (parts.length > 0) {
-    appliedEl.textContent = `Ajustes aplicados: ${parts.join(' · ')}`;
+  const summary = parts.length > 0 ? `Ajustes aplicados: ${parts.join(' · ')}` : '';
+  const limitHint = !data.withinLimit
+    ? `Supera el límite de WhatsApp (${formatKB(data.limitBytes)}). Activa Auto-comprimir o baja la calidad/FPS.`
+    : '';
+  const combined = [summary, limitHint].filter(Boolean).join(' — ');
+  if (combined) {
+    appliedEl.textContent = combined;
     appliedEl.classList.remove('hidden');
+  } else {
+    appliedEl.classList.add('hidden');
   }
 
   const dlWebp = $('downloadWebpLink');
@@ -445,8 +464,7 @@ function setupOutputControls() {
           recipient,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo enviar el sticker.');
+      const data = await parseJsonResponse(res, 'No se pudo enviar el sticker.');
 
       showToast(`Sticker enviado (${data.messageId})`);
     } catch (err) {
@@ -466,11 +484,12 @@ function updateSendButtonState() {
 async function pollWhatsAppStatus() {
   try {
     const res = await fetch('/api/status');
-    const data = await res.json();
+    const data = await parseJsonResponse(res, 'Error consultando estado.');
     state.waStatus = data;
 
     const badge = $('waStatusBadge');
     const qrBtn = $('openQrBtn');
+    const reconnectBtn = $('reconnectBtn');
     const logoutBtn = $('logoutBtn');
     const qrModal = $('qrModal');
 
@@ -479,6 +498,7 @@ async function pollWhatsAppStatus() {
       badge.textContent = `Conectado${who}`;
       badge.className = 'status-pill status-open';
       qrBtn.classList.add('hidden');
+      reconnectBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       qrModal.classList.add('hidden');
     } else if (data.status === 'qr' && data.qrDataUrl) {
@@ -486,16 +506,19 @@ async function pollWhatsAppStatus() {
       badge.className = 'status-pill status-qr';
       $('qrImage').src = data.qrDataUrl;
       qrBtn.classList.remove('hidden');
+      reconnectBtn.classList.add('hidden');
       logoutBtn.classList.add('hidden');
     } else if (data.status === 'connecting') {
       badge.textContent = 'Conectando...';
       badge.className = 'status-pill status-connecting';
       qrBtn.classList.add('hidden');
+      reconnectBtn.classList.add('hidden');
       logoutBtn.classList.add('hidden');
     } else {
       badge.textContent = data.skipped ? 'WhatsApp desactivado' : 'Desconectado';
       badge.className = 'status-pill status-disconnected';
       qrBtn.classList.add('hidden');
+      reconnectBtn.classList.toggle('hidden', Boolean(data.skipped));
       logoutBtn.classList.add('hidden');
     }
 
@@ -516,9 +539,20 @@ function setupModalControls() {
     if (e.target === $('qrModal')) $('qrModal').classList.add('hidden');
   });
 
+  $('reconnectBtn').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/whatsapp/reconnect', { method: 'POST' });
+      await parseJsonResponse(res, 'No se pudo reconectar WhatsApp.');
+      await pollWhatsAppStatus();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
   $('logoutBtn').addEventListener('click', async () => {
     try {
-      await fetch('/api/whatsapp/logout', { method: 'POST' });
+      const res = await fetch('/api/whatsapp/logout', { method: 'POST' });
+      await parseJsonResponse(res, 'No se pudo desvincular la sesión.');
       showToast('Sesión desvinculada. Escanea el nuevo QR.');
       await pollWhatsAppStatus();
       if (state.waStatus?.qrDataUrl) {

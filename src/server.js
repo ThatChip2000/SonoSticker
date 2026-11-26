@@ -67,6 +67,14 @@ export function createApp() {
   app.use(express.json());
   app.use(express.static(publicDir));
 
+  app.use('/api', (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+      return res.status(403).json({ error: 'Origen no permitido.' });
+    }
+    return next();
+  });
+
   app.get('/api/status', (_req, res) => {
     res.json({
       ...whatsappService.getStatus(),
@@ -81,6 +89,18 @@ export function createApp() {
       }
       const status = await whatsappService.logout();
       return res.json(status);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
+  app.post('/api/whatsapp/reconnect', async (_req, res, next) => {
+    try {
+      if (process.env.SKIP_WHATSAPP === '1') {
+        return res.json({ status: 'disconnected', skipped: true });
+      }
+      await whatsappService.start();
+      return res.json(whatsappService.getStatus());
     } catch (err) {
       return next(err);
     }
@@ -260,6 +280,8 @@ const isMain =
   process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isMain) {
+  await fs.rm(tmpUploadsDir, { recursive: true, force: true }).catch(() => {});
+  await fs.rm(tmpPreviewsDir, { recursive: true, force: true }).catch(() => {});
   await fs.mkdir(tmpUploadsDir, { recursive: true });
   await fs.mkdir(tmpPreviewsDir, { recursive: true });
 

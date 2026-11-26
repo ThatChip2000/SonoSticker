@@ -112,9 +112,18 @@ export function patchWAProtoForSoundStickers({ onWireCapture } = {}) {
   const origMessageEncode = Message.encode;
   const origMessageDecode = Message.decode;
 
+  const hasNativeStickerAudio = Object.prototype.hasOwnProperty.call(
+    StickerMessage.prototype,
+    'audioMessage'
+  );
+  const hasNativeAudioSticker = Object.prototype.hasOwnProperty.call(
+    Message.prototype,
+    'audioStickerMessage'
+  );
+
   StickerMessage.encode = function encodeWithAudio(m, w) {
     w = origStickerEncode(m, w);
-    if (m?.audioMessage != null && Object.hasOwnProperty.call(m, 'audioMessage')) {
+    if (!hasNativeStickerAudio && m?.audioMessage != null && Object.hasOwnProperty.call(m, 'audioMessage')) {
       // Field 26, wireType 2 => (26 << 3) | 2 = 210
       proto.Message.AudioMessage.encode(m.audioMessage, w.uint32(210).fork()).ldelim();
     }
@@ -123,7 +132,7 @@ export function patchWAProtoForSoundStickers({ onWireCapture } = {}) {
 
   Message.encode = function encodeWithAudioSticker(m, w) {
     w = origMessageEncode(m, w);
-    if (m?.audioStickerMessage != null && Object.hasOwnProperty.call(m, 'audioStickerMessage')) {
+    if (!hasNativeAudioSticker && m?.audioStickerMessage != null && Object.hasOwnProperty.call(m, 'audioStickerMessage')) {
       // Field 134, wireType 2 => (134 << 3) | 2 = 1074
       proto.Message.FutureProofMessage.encode(m.audioStickerMessage, w.uint32(1074).fork()).ldelim();
     }
@@ -145,7 +154,9 @@ export function patchWAProtoForSoundStickers({ onWireCapture } = {}) {
       let hasExtra = false;
       for (const entry of entries) {
         if (entry.fieldNumber === 26 && entry.wireType === 2 && entry.bytes) {
-          decoded.audioMessage = proto.Message.AudioMessage.decode(entry.bytes);
+          if (decoded.audioMessage == null) {
+            decoded.audioMessage = proto.Message.AudioMessage.decode(entry.bytes);
+          }
           hasExtra = true;
         } else if (entry.fieldNumber > 23) {
           hasExtra = true;
@@ -186,7 +197,9 @@ export function patchWAProtoForSoundStickers({ onWireCapture } = {}) {
         if (entry.fieldNumber === 26) {
           hasSticker = true;
         } else if (entry.fieldNumber === 134 && entry.wireType === 2 && entry.bytes) {
-          decoded.audioStickerMessage = proto.Message.FutureProofMessage.decode(entry.bytes);
+          if (decoded.audioStickerMessage == null) {
+            decoded.audioStickerMessage = proto.Message.FutureProofMessage.decode(entry.bytes);
+          }
           hasAudioSticker = true;
         } else if (entry.fieldNumber > 114) {
           hasUnknownTag = true;
