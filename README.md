@@ -17,7 +17,7 @@ App web local para crear, recortar, comprimir y enviar **Stickers con Audio (Sou
 
 ## Requisitos
 
-1. **Node.js 20 o superior** ([nodejs.org](https://nodejs.org/)).
+1. **Node.js 20 o superior** ([nodejs.org](https://nodejs.org/)). *(En Windows, `Abrir SonoSticker.bat` lo detecta e **instala Node.js LTS automáticamente** si no lo tienes).*
 2. **WhatsApp móvil actualizado** con soporte para *Sound Stickers*.
 3. *(FFmpeg viene integrado automáticamente mediante `ffmpeg-static`, no necesitas instalarlo aparte).*
 
@@ -28,7 +28,7 @@ App web local para crear, recortar, comprimir y enviar **Stickers con Audio (Sou
 ### Windows (1 clic)
 1. Descarga o clona este repositorio.
 2. Haz doble clic en **`Abrir SonoSticker.bat`**.
-3. La primera vez instalará las dependencias automáticamente y abrirá `http://localhost:3000` en tu navegador.
+3. Si falta Node.js, lo instalará automáticamente; la primera vez también instalará las dependencias y abrirá `http://localhost:3000` en tu navegador.
 
 ### macOS / Linux
 ```bash
