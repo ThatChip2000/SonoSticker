@@ -21,7 +21,7 @@ if defined NODE_FOUND goto node_ready
 :install_msi
 echo.
 echo Descargando instalador oficial de Node.js LTS...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $lts=(Invoke-RestMethod 'https://nodejs.org/dist/index.json' | Where-Object { $_.lts -ne $false } | Select-Object -First 1); $arch=if([Environment]::Is64BitOperatingSystem){'x64'}else{'x86'}; $url='https://nodejs.org/dist/'+$lts.version+'/node-'+$lts.version+'-'+$arch+'.msi'; $out=Join-Path $env:TEMP ('node-'+$lts.version+'.msi'); Write-Host ('Descargando '+$url+'...'); Invoke-WebRequest -Uri $url -OutFile $out; $p=Start-Process msiexec.exe -ArgumentList @('/i',$out,'/passive') -Wait -PassThru; Remove-Item $out -Force -ErrorAction SilentlyContinue; exit $p.ExitCode"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $lts=$null; foreach($x in (Invoke-RestMethod 'https://nodejs.org/dist/index.json')){ if($x.lts -is [string]){ $lts=$x; break } }; if(-not $lts){ exit 1 }; $arch=if([Environment]::Is64BitOperatingSystem){'x64'}else{'x86'}; $url='https://nodejs.org/dist/'+$lts.version+'/node-'+$lts.version+'-'+$arch+'.msi'; $out=Join-Path $env:TEMP ('node-'+$lts.version+'.msi'); Write-Host ('Descargando '+$url+'...'); (New-Object Net.WebClient).DownloadFile($url,$out); $p=Start-Process msiexec.exe -ArgumentList @('/i',$out,'/passive') -Wait -PassThru; Remove-Item $out -Force -ErrorAction SilentlyContinue; exit $p.ExitCode"
 call :find_node
 if defined NODE_FOUND goto node_ready
 
