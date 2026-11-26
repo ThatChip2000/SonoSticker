@@ -93,7 +93,7 @@ class WhatsAppService {
             lidJid,
             defaultSelfJid: lidJid || phoneJid,
           };
-          console.log(`🟢 WhatsApp conectado como ${this.state.user.name} (${this.state.user.defaultSelfJid})`);
+          console.log(`[WA] WhatsApp conectado como ${this.state.user.name} (${this.state.user.defaultSelfJid})`);
         }
 
         if (connection === 'close') {

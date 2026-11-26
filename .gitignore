@@ -4,5 +4,6 @@ test-assets/
 captured-sticker.json
 tmp-uploads/
 tmp-previews/
+dist-release/
 .DS_Store
 Thumbs.db

@@ -25,7 +25,7 @@ function assertSize(filePath, maxBytes, label) {
       `${label} excede el límite (${(size / 1024).toFixed(2)} KB >= ${(maxBytes / 1024).toFixed(0)} KB): ${filePath}`
     );
   }
-  console.log(`✔ ${label}: ${filePath} (${(size / 1024).toFixed(2)} KB)`);
+  console.log(`[OK] ${label}: ${filePath} (${(size / 1024).toFixed(2)} KB)`);
 }
 
 function main() {

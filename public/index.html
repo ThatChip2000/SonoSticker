@@ -9,7 +9,13 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <div class="brand-icon" aria-hidden="true">🔊</div>
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </div>
         <div>
           <h1>SonoSticker</h1>
           <p class="subtitle">Creador local de stickers con audio para WhatsApp (512×512)</p>
@@ -17,7 +23,7 @@
       </div>
 
       <div class="wa-controls">
-        <span id="waStatusBadge" class="status-pill status-connecting">🟡 Conectando...</span>
+        <span id="waStatusBadge" class="status-pill status-connecting">Conectando...</span>
         <button id="openQrBtn" type="button" class="btn btn-secondary btn-sm hidden">
           Ver QR
         </button>
@@ -38,7 +44,7 @@
             aria-selected="true"
             data-tab="video"
           >
-            🎬 Video → Sticker animado (5 s)
+            Video a Sticker animado (5 s)
           </button>
           <button
             id="tabBtnImageAudio"
@@ -48,7 +54,7 @@
             aria-selected="false"
             data-tab="image-audio"
           >
-            🖼️ Imagen + Audio (10 s)
+            Imagen + Audio (10 s)
           </button>
         </div>
 
@@ -104,7 +110,7 @@
                 </div>
 
                 <button id="videoLoopBtn" type="button" class="btn btn-secondary btn-sm full-width">
-                  ▶ Reproducir tramo en loop
+                  Reproducir tramo en loop
                 </button>
               </div>
             </div>
@@ -238,7 +244,7 @@
               </div>
 
               <button id="audioLoopBtn" type="button" class="btn btn-secondary btn-sm full-width">
-                ▶ Reproducir tramo en loop
+                Reproducir tramo en loop
               </button>
             </div>
           </div>
@@ -313,11 +319,14 @@
                 class="speaker-badge"
                 aria-label="Reproducir o detener sonido del sticker"
               >
-                🔊
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
               </button>
             </div>
             <audio id="generatedAudioPlayer" class="hidden"></audio>
-            <p class="tap-hint">Toca el sticker o el ícono 🔊 para escuchar el audio real (.ogg)</p>
+            <p class="tap-hint">Toca el sticker o el botón de audio para escuchar el sonido real (.ogg)</p>
           </div>
         </div>
 
@@ -377,7 +386,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <h3 id="qrModalTitle">Vincular WhatsApp</h3>
-          <button id="closeQrBtn" type="button" class="btn btn-ghost btn-sm">✕</button>
+          <button id="closeQrBtn" type="button" class="btn btn-ghost btn-sm">Cerrar</button>
         </div>
         <p class="modal-desc">
           Abre WhatsApp en tu celular → <strong>Dispositivos vinculados</strong> →

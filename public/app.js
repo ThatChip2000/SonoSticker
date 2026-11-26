@@ -476,24 +476,24 @@ async function pollWhatsAppStatus() {
 
     if (data.status === 'open') {
       const who = data.user?.name ? ` (${data.user.name})` : '';
-      badge.textContent = `🟢 Conectado${who}`;
+      badge.textContent = `Conectado${who}`;
       badge.className = 'status-pill status-open';
       qrBtn.classList.add('hidden');
       logoutBtn.classList.remove('hidden');
       qrModal.classList.add('hidden');
     } else if (data.status === 'qr' && data.qrDataUrl) {
-      badge.textContent = '🟡 Escanea el QR';
+      badge.textContent = 'Escanea el QR';
       badge.className = 'status-pill status-qr';
       $('qrImage').src = data.qrDataUrl;
       qrBtn.classList.remove('hidden');
       logoutBtn.classList.add('hidden');
     } else if (data.status === 'connecting') {
-      badge.textContent = '🟡 Conectando...';
+      badge.textContent = 'Conectando...';
       badge.className = 'status-pill status-connecting';
       qrBtn.classList.add('hidden');
       logoutBtn.classList.add('hidden');
     } else {
-      badge.textContent = data.skipped ? '⚪ WhatsApp desactivado' : '🔴 Desconectado';
+      badge.textContent = data.skipped ? 'WhatsApp desactivado' : 'Desconectado';
       badge.className = 'status-pill status-disconnected';
       qrBtn.classList.add('hidden');
       logoutBtn.classList.add('hidden');

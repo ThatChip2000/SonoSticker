@@ -88,7 +88,7 @@ function assertAssetsExist() {
   const paths = getAssetPaths();
   const missing = Object.values(paths).filter((p) => !fs.existsSync(p));
   if (missing.length > 0) {
-    console.error('❌ Faltan archivos de prueba en test-assets/:');
+    console.error('[ERROR] Faltan archivos de prueba en test-assets/:');
     for (const p of missing) console.error(`   - ${p}`);
     console.error('Ejecuta primero: npm run generate-assets');
     process.exit(1);
@@ -125,7 +125,7 @@ async function sendTestSoundSticker(sock, jid, command, assetPaths, sentByBotIds
   const webpBuffer = fs.readFileSync(webpPath);
   const audioBuffer = fs.readFileSync(assetPaths.audioOgg);
 
-  console.log(`⏳ Subiendo sticker (${isAnimated ? 'animado' : 'estático'}) y audio Opus...`);
+  console.log(`[INFO] Subiendo sticker (${isAnimated ? 'animado' : 'estático'}) y audio Opus...`);
 
   const [stickerMedia, audioMedia] = await Promise.all([
     prepareWAMessageMedia(
@@ -158,7 +158,7 @@ async function sendTestSoundSticker(sock, jid, command, assetPaths, sentByBotIds
     sentByBotIds.add(messageId);
   }
 
-  console.log(`✅ Enviado (${command}) con messageId=${messageId}`);
+  console.log(`[OK] Enviado (${command}) con messageId=${messageId}`);
   console.log(JSON.stringify(sanitizeForJson(payload), null, 2));
 }
 
@@ -178,12 +178,12 @@ async function startBot() {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      console.log('\n📱 Escanea este código QR desde WhatsApp -> Dispositivos vinculados:\n');
+      console.log('\n[WA] Escanea este código QR desde WhatsApp -> Dispositivos vinculados:\n');
       qrcode.generate(qr, { small: true });
     }
 
     if (connection === 'open') {
-      console.log('\n🟢 Conectado a WhatsApp!');
+      console.log('\n[WA] Conectado a WhatsApp!');
       console.log('1) Envía un Sound Sticker desde tu celular a tu propio chat ("Tú") para capturar su protobuf en captured-sticker.json.');
       console.log('2) O escribe en tu chat propio: !test-static | !test-anim | !test-wrapped | !help\n');
     }
@@ -194,7 +194,7 @@ async function startBot() {
           ? lastDisconnect.error.output?.statusCode
           : undefined;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`🔴 Conexión cerrada (status=${statusCode}). Reconectar=${shouldReconnect}`);
+      console.log(`[WA] Conexión cerrada (status=${statusCode}). Reconectar=${shouldReconnect}`);
       if (shouldReconnect) {
         startBot().catch((err) => console.error('Error reconectando:', err));
       }
@@ -214,7 +214,7 @@ async function startBot() {
           rawWireCaptures: recentWireCaptures.splice(0),
         };
         fs.writeFileSync(capturedPath, JSON.stringify(snapshot, null, 2), 'utf8');
-        console.log(`🔎 Sticker detectado (keys: ${keys.join(', ')}). Guardado en ${capturedPath}`);
+        console.log(`[CAPTURE] Sticker detectado (keys: ${keys.join(', ')}). Guardado en ${capturedPath}`);
       }
 
       if (!msg.key?.fromMe || sentByBotIds.has(msg.key.id)) {
@@ -236,7 +236,7 @@ async function startBot() {
         try {
           await sendTestSoundSticker(sock, msg.key.remoteJid, cmd, assetPaths, sentByBotIds);
         } catch (err) {
-          console.error(`❌ Error ejecutando ${cmd}:`, err);
+          console.error(`[ERROR] Error ejecutando ${cmd}:`, err);
         }
       }
     }
@@ -248,7 +248,7 @@ const isMain =
 
 if (isMain) {
   startBot().catch((err) => {
-    console.error('❌ Error fatal en el PoC:', err);
+    console.error('[ERROR] Error fatal en el PoC:', err);
     process.exit(1);
   });
 }

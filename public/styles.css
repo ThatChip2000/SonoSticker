@@ -53,9 +53,16 @@ body {
   height: 42px;
   border-radius: 12px;
   background: linear-gradient(135deg, #00a884, #005c4b);
+  color: #05261e;
   display: grid;
   place-items: center;
-  font-size: 1.3rem;
+}
+
+.brand-icon svg,
+.speaker-badge svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .brand h1 {
@@ -77,6 +84,9 @@ body {
 }
 
 .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   font-size: 0.82rem;
@@ -85,9 +95,21 @@ body {
   background: var(--surface-2);
 }
 
+.status-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
 .status-open {
   border-color: rgba(0, 168, 132, 0.5);
   color: #53f3c7;
+}
+
+.status-open::before {
+  background: #00a884;
 }
 
 .status-qr,
@@ -96,9 +118,18 @@ body {
   color: #fcd34d;
 }
 
+.status-qr::before,
+.status-connecting::before {
+  background: #f59e0b;
+}
+
 .status-disconnected {
   border-color: rgba(241, 92, 109, 0.5);
   color: #fda4af;
+}
+
+.status-disconnected::before {
+  background: #f15c6d;
 }
 
 .studio-layout {

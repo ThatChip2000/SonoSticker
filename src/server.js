@@ -269,7 +269,7 @@ if (isMain) {
   const app = createApp();
 
   const server = app.listen(port, '127.0.0.1', () => {
-    console.log(`\n🚀 SonoSticker disponible en: ${url}`);
+    console.log(`\n[OK] SonoSticker disponible en: ${url}`);
     if (shouldOpen) {
       openBrowser(url);
     }
@@ -282,13 +282,13 @@ if (isMain) {
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.log(`ℹ️ SonoSticker ya está ejecutándose en: ${url}`);
+      console.log(`[INFO] SonoSticker ya está ejecutándose en: ${url}`);
       if (shouldOpen) {
         openBrowser(url);
       }
       process.exit(0);
     }
-    console.error('❌ Error iniciando el servidor:', err);
+    console.error('[ERROR] Error iniciando el servidor:', err);
     process.exit(1);
   });
 }

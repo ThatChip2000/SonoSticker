@@ -3,6 +3,8 @@ chcp 65001 >nul
 title SonoSticker
 cd /d "%~dp0"
 
+if exist "%~dp0runtime\node.exe" if exist "%~dp0node_modules" goto run_portable
+
 call :find_node
 if defined NODE_FOUND goto node_ready
 
@@ -55,6 +57,16 @@ if errorlevel 1 (
 :start_app
 echo Iniciando SonoSticker... ^(se abrira el navegador automaticamente^)
 call npm start
+if errorlevel 1 (
+  echo.
+  echo [ERROR] SonoSticker se detuvo con un error.
+  pause
+)
+exit /b 0
+
+:run_portable
+echo Iniciando SonoSticker ^(modo portable^)... se abrira el navegador automaticamente.
+"%~dp0runtime\node.exe" "%~dp0src\server.js"
 if errorlevel 1 (
   echo.
   echo [ERROR] SonoSticker se detuvo con un error.
