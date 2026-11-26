@@ -222,6 +222,42 @@ body {
   background: rgba(0, 168, 132, 0.1);
 }
 
+.dropzone-compact {
+  padding: 0.75rem 0.9rem;
+}
+
+.optional-audio-card {
+  background: rgba(31, 44, 52, 0.45);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.optional-audio-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.optional-audio-header p {
+  margin: 0.15rem 0 0;
+}
+
+.optional-audio-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.optional-audio-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 .dropzone-content {
   display: flex;
   flex-direction: column;

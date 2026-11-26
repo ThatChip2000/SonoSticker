@@ -170,11 +170,27 @@ class WhatsAppService {
     }
 
     const targetJid = this.resolveTargetJid(recipient);
-    const [webpBuffer, audioBuffer] = await Promise.all([
-      fs.readFile(webpPath),
-      fs.readFile(audioPath),
-    ]);
+    const webpBuffer = await fs.readFile(webpPath);
 
+    if (!audioPath) {
+      const stickerMedia = await prepareWAMessageMedia(
+        { sticker: webpBuffer, isAnimated: Boolean(isAnimated) },
+        { upload: this.sock.waUploadToServer }
+      );
+      const payload = {
+        stickerMessage: {
+          ...stickerMedia.stickerMessage,
+          mimetype: stickerMedia.stickerMessage?.mimetype || 'image/webp',
+          width: stickerMedia.stickerMessage?.width || 512,
+          height: stickerMedia.stickerMessage?.height || 512,
+          isAnimated: Boolean(isAnimated),
+        },
+      };
+      const messageId = await this.sock.relayMessage(targetJid, payload, {});
+      return { messageId, targetJid };
+    }
+
+    const audioBuffer = await fs.readFile(audioPath);
     const roundedSeconds = Math.max(1, Math.round(Number(seconds) || 2));
 
     const [stickerMedia, audioMedia] = await Promise.all([

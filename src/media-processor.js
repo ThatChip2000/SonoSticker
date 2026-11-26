@@ -153,35 +153,41 @@ async function encodeNormalizedOpusAudio(
   };
 }
 
-/**
- * Converts a trimmed video segment into a 512x512 animated WebP + Opus OGG audio pair.
- */
-export async function processVideoToSoundSticker(inputPath, outputDir, options = {}) {
-  const probe = await probeMedia(inputPath);
-  if (!probe.hasVideo) {
-    throw new Error('El archivo subido no contiene una pista de video válida.');
-  }
-  if (!probe.hasAudio) {
+function resolveTrimSegment(totalDurationSec, rawStart, rawDuration, fallbackDuration, label) {
+  const startSec = clamp(rawStart, 0, 36000, 0);
+  if (totalDurationSec != null && startSec >= totalDurationSec - 0.1) {
     throw new Error(
-      'El video no tiene pista de audio. Usa el módulo de Imagen + Audio o sube un video con sonido.'
+      `El segundo de inicio (${startSec}s) supera la duración del ${label} (${totalDurationSec}s).`
     );
   }
-
-  await fs.mkdir(outputDir, { recursive: true });
-
-  const startSec = clamp(options.startSec, 0, 36000, 0);
-  if (probe.durationSec != null && startSec >= probe.durationSec - 0.1) {
-    throw new Error(
-      `El segundo de inicio (${startSec}s) supera la duración del video (${probe.durationSec}s).`
-    );
-  }
-  let durationSec = clamp(options.durationSec, 0.5, 10, 5);
-  if (probe.durationSec != null && probe.durationSec > startSec + 0.2) {
-    const remaining = Number((probe.durationSec - startSec).toFixed(2));
+  let durationSec = clamp(rawDuration, 0.5, 10, fallbackDuration);
+  if (totalDurationSec != null && totalDurationSec > startSec + 0.2) {
+    const remaining = Number((totalDurationSec - startSec).toFixed(2));
     if (remaining >= 0.5) {
       durationSec = Math.min(durationSec, remaining);
     }
   }
+  return { startSec, durationSec };
+}
+
+/**
+ * Converts a trimmed video or animated GIF into a 512x512 animated WebP + optional Opus OGG pair.
+ */
+export async function processVideoToSoundSticker(inputPath, outputDir, options = {}) {
+  const probe = await probeMedia(inputPath);
+  if (!probe.hasVideo) {
+    throw new Error('El archivo subido no contiene una pista de video o GIF válida.');
+  }
+
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const { startSec, durationSec } = resolveTrimSegment(
+    probe.durationSec,
+    options.startSec,
+    options.durationSec,
+    5,
+    'video'
+  );
 
   const fitMode = options.fitMode === 'contain' ? 'contain' : 'cover';
   let fps = Math.round(clamp(options.fps, 5, 24, 12));
@@ -189,6 +195,8 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
   const audioBitrateKbps = Math.round(clamp(options.audioBitrateKbps, 12, 96, 24));
   const audioVolume = clamp(options.audioVolume, 0.2, 2.0, 1.0);
   const autoFitLimit = parseBool(options.autoFitLimit, false);
+  const muteVideoAudio = parseBool(options.muteVideoAudio, false);
+  const customAudioPath = options.customAudioPath || null;
 
   const webpPath = path.join(outputDir, 'sticker.webp');
   const audioPath = path.join(outputDir, 'audio.ogg');
@@ -244,59 +252,68 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
     }
   }
 
-  const audioResult = await encodeNormalizedOpusAudio(inputPath, audioPath, {
-    startSec,
-    durationSec,
-    audioBitrateKbps,
-    audioVolume,
-    autoFitLimit,
-  });
+  let audioResult = null;
+  let audioSource = 'none';
+
+  if (customAudioPath) {
+    const customProbe = await probeMedia(customAudioPath);
+    if (!customProbe.hasAudio) {
+      throw new Error('El archivo de audio seleccionado no contiene pista de audio.');
+    }
+    const customTrim = resolveTrimSegment(
+      customProbe.durationSec,
+      options.audioStartSec,
+      options.audioDurationSec ?? durationSec,
+      durationSec,
+      'audio'
+    );
+    audioResult = await encodeNormalizedOpusAudio(customAudioPath, audioPath, {
+      startSec: customTrim.startSec,
+      durationSec: customTrim.durationSec,
+      audioBitrateKbps,
+      audioVolume,
+      autoFitLimit,
+    });
+    audioSource = 'custom';
+  } else if (probe.hasAudio && !muteVideoAudio) {
+    audioResult = await encodeNormalizedOpusAudio(inputPath, audioPath, {
+      startSec,
+      durationSec,
+      audioBitrateKbps,
+      audioVolume,
+      autoFitLimit,
+    });
+    audioSource = 'video';
+  }
 
   return {
     webpPath,
-    audioPath,
+    audioPath: audioResult ? audioPath : null,
+    hasAudio: Boolean(audioResult),
     webpSizeBytes,
-    audioSizeBytes: audioResult.audioSizeBytes,
-    durationSec: audioResult.durationSec,
+    audioSizeBytes: audioResult?.audioSizeBytes ?? 0,
+    durationSec: audioResult?.durationSec ?? durationSec,
     isAnimated: true,
     limitBytes: ANIMATED_LIMIT_BYTES,
     withinLimit: webpSizeBytes < ANIMATED_LIMIT_BYTES,
     appliedSettings: {
       fps,
       webpQuality,
-      audioBitrateKbps: audioResult.appliedAudioBitrateKbps,
+      audioBitrateKbps: audioResult ? audioResult.appliedAudioBitrateKbps : null,
       fitMode,
+      audioSource,
     },
   };
 }
 
 /**
- * Combines a static image (512x512 WebP) and a trimmed audio track (Opus OGG) into a Sound Sticker.
+ * Converts a static image (512x512 WebP) with an optional trimmed audio track (Opus OGG).
  */
 export async function processImageAudioToSoundSticker(imagePath, audioSourcePath, outputDir, options = {}) {
-  const audioProbeInput = await probeMedia(audioSourcePath);
-  if (!audioProbeInput.hasAudio) {
-    throw new Error('El archivo seleccionado no contiene pista de audio.');
-  }
-
   await fs.mkdir(outputDir, { recursive: true });
 
   const fitMode = options.fitMode === 'cover' ? 'cover' : 'contain';
   let webpQuality = Math.round(clamp(options.webpQuality, 10, 95, 75));
-  const audioStartSec = clamp(options.audioStartSec, 0, 36000, 0);
-  if (audioProbeInput.durationSec != null && audioStartSec >= audioProbeInput.durationSec - 0.1) {
-    throw new Error(
-      `El segundo de inicio (${audioStartSec}s) supera la duración del audio (${audioProbeInput.durationSec}s).`
-    );
-  }
-  let audioDurationSec = clamp(options.audioDurationSec, 0.5, 10, 5);
-  if (audioProbeInput.durationSec != null && audioProbeInput.durationSec > audioStartSec + 0.2) {
-    const remaining = Number((audioProbeInput.durationSec - audioStartSec).toFixed(2));
-    if (remaining >= 0.5) {
-      audioDurationSec = Math.min(audioDurationSec, remaining);
-    }
-  }
-
   const audioBitrateKbps = Math.round(clamp(options.audioBitrateKbps, 12, 96, 24));
   const audioVolume = clamp(options.audioVolume, 0.2, 2.0, 1.0);
   const autoFitLimit = parseBool(options.autoFitLimit, false);
@@ -341,27 +358,43 @@ export async function processImageAudioToSoundSticker(imagePath, audioSourcePath
     }
   }
 
-  const audioResult = await encodeNormalizedOpusAudio(audioSourcePath, audioPath, {
-    startSec: audioStartSec,
-    durationSec: audioDurationSec,
-    audioBitrateKbps,
-    audioVolume,
-    autoFitLimit,
-  });
+  let audioResult = null;
+  if (audioSourcePath) {
+    const audioProbeInput = await probeMedia(audioSourcePath);
+    if (!audioProbeInput.hasAudio) {
+      throw new Error('El archivo seleccionado no contiene pista de audio.');
+    }
+    const audioTrim = resolveTrimSegment(
+      audioProbeInput.durationSec,
+      options.audioStartSec,
+      options.audioDurationSec,
+      5,
+      'audio'
+    );
+    audioResult = await encodeNormalizedOpusAudio(audioSourcePath, audioPath, {
+      startSec: audioTrim.startSec,
+      durationSec: audioTrim.durationSec,
+      audioBitrateKbps,
+      audioVolume,
+      autoFitLimit,
+    });
+  }
 
   return {
     webpPath,
-    audioPath,
+    audioPath: audioResult ? audioPath : null,
+    hasAudio: Boolean(audioResult),
     webpSizeBytes,
-    audioSizeBytes: audioResult.audioSizeBytes,
-    durationSec: audioResult.durationSec,
+    audioSizeBytes: audioResult?.audioSizeBytes ?? 0,
+    durationSec: audioResult?.durationSec ?? 0,
     isAnimated: false,
     limitBytes: STATIC_LIMIT_BYTES,
     withinLimit: webpSizeBytes < STATIC_LIMIT_BYTES,
     appliedSettings: {
       webpQuality,
-      audioBitrateKbps: audioResult.appliedAudioBitrateKbps,
+      audioBitrateKbps: audioResult ? audioResult.appliedAudioBitrateKbps : null,
       fitMode,
+      audioSource: audioResult ? 'custom' : 'none',
     },
   };
 }

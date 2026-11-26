@@ -33,7 +33,8 @@ function formatPreviewResponse(id, result) {
   return {
     id,
     webpUrl: `/api/previews/${id}/sticker.webp`,
-    audioUrl: `/api/previews/${id}/audio.ogg`,
+    audioUrl: result.hasAudio ? `/api/previews/${id}/audio.ogg` : null,
+    hasAudio: Boolean(result.hasAudio),
     webpSizeBytes: result.webpSizeBytes,
     audioSizeBytes: result.audioSizeBytes,
     durationSec: result.durationSec,
@@ -106,44 +107,60 @@ export function createApp() {
     }
   });
 
-  app.post('/api/preview/video', upload.single('video'), async (req, res, next) => {
-    const videoFile = req.file;
-    if (!videoFile) {
-      return res.status(400).json({ error: 'Debes subir un archivo de video.' });
+  app.post(
+    '/api/preview/video',
+    upload.fields([
+      { name: 'video', maxCount: 1 },
+      { name: 'audio', maxCount: 1 },
+    ]),
+    async (req, res, next) => {
+      const videoFile = req.files?.video?.[0];
+      const audioFile = req.files?.audio?.[0];
+
+      if (!videoFile) {
+        await safeUnlink(audioFile?.path);
+        return res.status(400).json({ error: 'Debes subir un archivo de video o GIF.' });
+      }
+
+      const id = crypto.randomUUID();
+      const previewDir = path.join(tmpPreviewsDir, id);
+
+      try {
+        const result = await processVideoToSoundSticker(videoFile.path, previewDir, {
+          startSec: req.body.startSec,
+          durationSec: req.body.durationSec,
+          fitMode: req.body.fitMode,
+          fps: req.body.fps,
+          webpQuality: req.body.webpQuality,
+          audioBitrateKbps: req.body.audioBitrateKbps,
+          audioVolume: req.body.audioVolume,
+          autoFitLimit: req.body.autoFitLimit,
+          customAudioPath: audioFile?.path || null,
+          audioStartSec: req.body.audioStartSec,
+          audioDurationSec: req.body.audioDurationSec,
+          muteVideoAudio: req.body.muteVideoAudio,
+        });
+
+        previews.set(id, {
+          dir: previewDir,
+          webpPath: result.webpPath,
+          audioPath: result.audioPath,
+          hasAudio: result.hasAudio,
+          isAnimated: result.isAnimated,
+          durationSec: result.durationSec,
+          createdAt: Date.now(),
+        });
+
+        return res.json(formatPreviewResponse(id, result));
+      } catch (err) {
+        await fs.rm(previewDir, { recursive: true, force: true }).catch(() => {});
+        return next(err);
+      } finally {
+        await safeUnlink(videoFile.path);
+        await safeUnlink(audioFile?.path);
+      }
     }
-
-    const id = crypto.randomUUID();
-    const previewDir = path.join(tmpPreviewsDir, id);
-
-    try {
-      const result = await processVideoToSoundSticker(videoFile.path, previewDir, {
-        startSec: req.body.startSec,
-        durationSec: req.body.durationSec,
-        fitMode: req.body.fitMode,
-        fps: req.body.fps,
-        webpQuality: req.body.webpQuality,
-        audioBitrateKbps: req.body.audioBitrateKbps,
-        audioVolume: req.body.audioVolume,
-        autoFitLimit: req.body.autoFitLimit,
-      });
-
-      previews.set(id, {
-        dir: previewDir,
-        webpPath: result.webpPath,
-        audioPath: result.audioPath,
-        isAnimated: result.isAnimated,
-        durationSec: result.durationSec,
-        createdAt: Date.now(),
-      });
-
-      return res.json(formatPreviewResponse(id, result));
-    } catch (err) {
-      await fs.rm(previewDir, { recursive: true, force: true }).catch(() => {});
-      return next(err);
-    } finally {
-      await safeUnlink(videoFile.path);
-    }
-  });
+  );
 
   app.post(
     '/api/preview/image-audio',
@@ -155,10 +172,9 @@ export function createApp() {
       const imageFile = req.files?.image?.[0];
       const audioFile = req.files?.audio?.[0];
 
-      if (!imageFile || !audioFile) {
-        await safeUnlink(imageFile?.path);
+      if (!imageFile) {
         await safeUnlink(audioFile?.path);
-        return res.status(400).json({ error: 'Debes subir una imagen y un archivo de audio (o video).' });
+        return res.status(400).json({ error: 'Debes subir una imagen.' });
       }
 
       const id = crypto.randomUUID();
@@ -167,7 +183,7 @@ export function createApp() {
       try {
         const result = await processImageAudioToSoundSticker(
           imageFile.path,
-          audioFile.path,
+          audioFile?.path || null,
           previewDir,
           {
             fitMode: req.body.fitMode,
@@ -184,6 +200,7 @@ export function createApp() {
           dir: previewDir,
           webpPath: result.webpPath,
           audioPath: result.audioPath,
+          hasAudio: result.hasAudio,
           isAnimated: result.isAnimated,
           durationSec: result.durationSec,
           createdAt: Date.now(),
@@ -195,7 +212,7 @@ export function createApp() {
         return next(err);
       } finally {
         await safeUnlink(imageFile.path);
-        await safeUnlink(audioFile.path);
+        await safeUnlink(audioFile?.path);
       }
     }
   );
@@ -215,7 +232,7 @@ export function createApp() {
 
   app.get('/api/previews/:id/audio.ogg', (req, res) => {
     const entry = previews.get(req.params.id);
-    if (!entry) {
+    if (!entry || !entry.audioPath) {
       return res.status(404).json({ error: 'Audio no encontrado o expirado.' });
     }
     res.setHeader('Content-Type', 'audio/ogg');

@@ -2,14 +2,18 @@ const state = {
   waStatus: null,
   activeTab: 'video',
   videoFile: null,
+  videoIsGif: false,
+  videoCustomAudioFile: null,
   imageFile: null,
   audioFile: null,
   videoObjectUrl: null,
+  videoCustomAudioObjectUrl: null,
   imageObjectUrl: null,
   audioObjectUrl: null,
   currentPreview: null,
   loopMonitor: {
     video: null,
+    customAudio: null,
     audio: null,
   },
 };
@@ -106,8 +110,14 @@ function setupQuickPills(targetName, rangeEl, numEl) {
   numEl.addEventListener('input', () => syncActive(numEl.value));
 }
 
+function getLoopMediaEl(kind) {
+  if (kind === 'video') return $('videoPlayer');
+  if (kind === 'customAudio') return $('videoCustomAudioPlayer');
+  return $('audioPlayer');
+}
+
 function stopSegmentLoop(kind) {
-  const mediaEl = kind === 'video' ? $('videoPlayer') : $('audioPlayer');
+  const mediaEl = getLoopMediaEl(kind);
   if (state.loopMonitor[kind]) {
     mediaEl.removeEventListener('timeupdate', state.loopMonitor[kind]);
     state.loopMonitor[kind] = null;
@@ -115,7 +125,7 @@ function stopSegmentLoop(kind) {
 }
 
 function playSegmentLoop(kind, startSec, durationSec) {
-  const mediaEl = kind === 'video' ? $('videoPlayer') : $('audioPlayer');
+  const mediaEl = getLoopMediaEl(kind);
   if (!mediaEl.src) {
     showToast('Primero carga un archivo para reproducir el tramo.', 'error');
     return;
@@ -157,15 +167,24 @@ function setupTabs() {
 
 function setupVideoTab() {
   const player = $('videoPlayer');
+  const gifPlayer = $('gifPlayer');
   const fitSelect = $('videoFitMode');
   const startRange = $('videoStartRange');
   const startNum = $('videoStartNum');
   const durRange = $('videoDurationRange');
   const durNum = $('videoDurationNum');
 
+  const customAudioPlayer = $('videoCustomAudioPlayer');
+  const customAudioStartRange = $('videoCustomAudioStartRange');
+  const customAudioStartNum = $('videoCustomAudioStartNum');
+  const customAudioDurRange = $('videoCustomAudioDurationRange');
+  const customAudioDurNum = $('videoCustomAudioDurationNum');
+
   bindRangeAndNumber(startRange, startNum);
   bindRangeAndNumber(durRange, durNum);
   setupQuickPills('videoDuration', durRange, durNum);
+  bindRangeAndNumber(customAudioStartRange, customAudioStartNum);
+  bindRangeAndNumber(customAudioDurRange, customAudioDurNum);
 
   $('videoFpsRange').addEventListener('input', (e) => {
     $('videoFpsVal').textContent = `${e.target.value} fps`;
@@ -178,7 +197,11 @@ function setupVideoTab() {
   });
 
   const syncFitClass = () => {
-    player.className = fitSelect.value === 'contain' ? 'contain-fit' : 'cover-fit';
+    const cls = fitSelect.value === 'contain' ? 'contain-fit' : 'cover-fit';
+    player.classList.toggle('contain-fit', cls === 'contain-fit');
+    player.classList.toggle('cover-fit', cls === 'cover-fit');
+    gifPlayer.classList.toggle('contain-fit', cls === 'contain-fit');
+    gifPlayer.classList.toggle('cover-fit', cls === 'cover-fit');
   };
   syncFitClass();
   fitSelect.addEventListener('change', syncFitClass);
@@ -186,10 +209,32 @@ function setupVideoTab() {
   setupDropzone($('videoDropzone'), $('videoFileInput'), (file) => {
     stopSegmentLoop('video');
     state.videoFile = file;
+    state.videoIsGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
     $('videoFileName').textContent = `${file.name} (${formatKB(file.size)})`;
     if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
     state.videoObjectUrl = URL.createObjectURL(file);
-    player.src = state.videoObjectUrl;
+
+    if (state.videoIsGif) {
+      player.pause();
+      player.removeAttribute('src');
+      player.classList.add('hidden');
+      gifPlayer.src = state.videoObjectUrl;
+      gifPlayer.classList.remove('hidden');
+      $('videoUseCurrentBtn').classList.add('hidden');
+      $('videoLoopBtn').classList.add('hidden');
+      $('videoMuteOriginalWrap').classList.add('hidden');
+      startRange.value = '0';
+      startNum.value = '0';
+    } else {
+      gifPlayer.removeAttribute('src');
+      gifPlayer.classList.add('hidden');
+      player.src = state.videoObjectUrl;
+      player.classList.remove('hidden');
+      $('videoUseCurrentBtn').classList.remove('hidden');
+      $('videoLoopBtn').classList.remove('hidden');
+      $('videoMuteOriginalWrap').classList.toggle('hidden', Boolean(state.videoCustomAudioFile));
+    }
+
     $('videoEditorBody').classList.remove('hidden');
   });
 
@@ -215,16 +260,70 @@ function setupVideoTab() {
     playSegmentLoop('video', startNum.value, durNum.value);
   });
 
+  const clearCustomAudio = () => {
+    stopSegmentLoop('customAudio');
+    state.videoCustomAudioFile = null;
+    $('videoCustomAudioInput').value = '';
+    if (state.videoCustomAudioObjectUrl) {
+      URL.revokeObjectURL(state.videoCustomAudioObjectUrl);
+      state.videoCustomAudioObjectUrl = null;
+    }
+    customAudioPlayer.pause();
+    customAudioPlayer.removeAttribute('src');
+    $('videoCustomAudioName').textContent = 'Haz clic o arrastra un audio distinto (opcional)';
+    $('videoCustomAudioControls').classList.add('hidden');
+    $('clearVideoCustomAudioBtn').classList.add('hidden');
+    if (!state.videoIsGif) {
+      $('videoMuteOriginalWrap').classList.remove('hidden');
+    }
+  };
+
+  $('clearVideoCustomAudioBtn').addEventListener('click', clearCustomAudio);
+
+  setupDropzone($('videoCustomAudioDropzone'), $('videoCustomAudioInput'), (file) => {
+    stopSegmentLoop('customAudio');
+    state.videoCustomAudioFile = file;
+    $('videoCustomAudioName').textContent = `${file.name} (${formatKB(file.size)})`;
+    if (state.videoCustomAudioObjectUrl) URL.revokeObjectURL(state.videoCustomAudioObjectUrl);
+    state.videoCustomAudioObjectUrl = URL.createObjectURL(file);
+    customAudioPlayer.src = state.videoCustomAudioObjectUrl;
+    $('videoCustomAudioControls').classList.remove('hidden');
+    $('clearVideoCustomAudioBtn').classList.remove('hidden');
+    $('videoMuteOriginalWrap').classList.add('hidden');
+  });
+
+  customAudioPlayer.addEventListener('loadedmetadata', () => {
+    if (Number.isFinite(customAudioPlayer.duration) && customAudioPlayer.duration > 0) {
+      const maxStart = Math.max(0, Number((customAudioPlayer.duration - 0.5).toFixed(1)));
+      customAudioStartRange.max = String(maxStart);
+      customAudioStartNum.max = String(customAudioPlayer.duration.toFixed(1));
+      if (Number(customAudioStartNum.value) > maxStart) {
+        customAudioStartRange.value = '0';
+        customAudioStartNum.value = '0';
+      }
+    }
+  });
+
+  $('videoCustomAudioUseCurrentBtn').addEventListener('click', () => {
+    const t = Number(customAudioPlayer.currentTime.toFixed(1));
+    customAudioStartRange.value = String(Math.min(Number(customAudioStartRange.max), t));
+    customAudioStartNum.value = String(t);
+  });
+
+  $('videoCustomAudioLoopBtn').addEventListener('click', () => {
+    playSegmentLoop('customAudio', customAudioStartNum.value, customAudioDurNum.value);
+  });
+
   $('videoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!state.videoFile) {
-      showToast('Sube un video primero.', 'error');
+      showToast('Sube un video o GIF primero.', 'error');
       return;
     }
 
     const btn = $('videoGenerateBtn');
     btn.disabled = true;
-    btn.textContent = 'Procesando video con FFmpeg...';
+    btn.textContent = 'Procesando con FFmpeg...';
 
     try {
       const formData = new FormData();
@@ -237,9 +336,15 @@ function setupVideoTab() {
       formData.append('audioBitrateKbps', $('videoAudioBitrate').value);
       formData.append('audioVolume', String(Number($('videoVolumeRange').value) / 100));
       formData.append('autoFitLimit', String($('videoAutoFit').checked));
+      formData.append('muteVideoAudio', String($('videoMuteOriginal').checked));
+      if (state.videoCustomAudioFile) {
+        formData.append('audio', state.videoCustomAudioFile);
+        formData.append('audioStartSec', customAudioStartNum.value);
+        formData.append('audioDurationSec', customAudioDurNum.value);
+      }
 
       const res = await fetch('/api/preview/video', { method: 'POST', body: formData });
-      const data = await parseJsonResponse(res, 'No se pudo procesar el video.');
+      const data = await parseJsonResponse(res, 'No se pudo procesar el archivo.');
 
       renderGeneratedPreview(data);
       showToast('Vista previa generada.');
@@ -296,6 +401,21 @@ function setupImageAudioTab() {
     if (state.audioObjectUrl) URL.revokeObjectURL(state.audioObjectUrl);
     state.audioObjectUrl = URL.createObjectURL(file);
     audioEl.src = state.audioObjectUrl;
+    $('clearStaticAudioBtn').classList.remove('hidden');
+  });
+
+  $('clearStaticAudioBtn').addEventListener('click', () => {
+    stopSegmentLoop('audio');
+    state.audioFile = null;
+    $('audioFileInput').value = '';
+    if (state.audioObjectUrl) {
+      URL.revokeObjectURL(state.audioObjectUrl);
+      state.audioObjectUrl = null;
+    }
+    audioEl.pause();
+    audioEl.removeAttribute('src');
+    $('audioFileName').textContent = 'Sin audio crea un sticker estático normal';
+    $('clearStaticAudioBtn').classList.add('hidden');
   });
 
   audioEl.addEventListener('loadedmetadata', () => {
@@ -322,29 +442,31 @@ function setupImageAudioTab() {
 
   $('imageAudioForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!state.imageFile || !state.audioFile) {
-      showToast('Sube tanto la imagen como el archivo de audio o video.', 'error');
+    if (!state.imageFile) {
+      showToast('Sube una imagen primero.', 'error');
       return;
     }
 
     const btn = $('staticGenerateBtn');
     btn.disabled = true;
-    btn.textContent = 'Procesando imagen y audio...';
+    btn.textContent = state.audioFile ? 'Procesando imagen y audio...' : 'Procesando imagen...';
 
     try {
       const formData = new FormData();
       formData.append('image', state.imageFile);
-      formData.append('audio', state.audioFile);
+      if (state.audioFile) {
+        formData.append('audio', state.audioFile);
+        formData.append('audioStartSec', startNum.value);
+        formData.append('audioDurationSec', durNum.value);
+        formData.append('audioBitrateKbps', $('staticAudioBitrate').value);
+        formData.append('audioVolume', String(Number($('staticVolumeRange').value) / 100));
+      }
       formData.append('fitMode', fitSelect.value);
       formData.append('webpQuality', $('staticQualityRange').value);
-      formData.append('audioStartSec', startNum.value);
-      formData.append('audioDurationSec', durNum.value);
-      formData.append('audioBitrateKbps', $('staticAudioBitrate').value);
-      formData.append('audioVolume', String(Number($('staticVolumeRange').value) / 100));
       formData.append('autoFitLimit', String($('staticAutoFit').checked));
 
       const res = await fetch('/api/preview/image-audio', { method: 'POST', body: formData });
-      const data = await parseJsonResponse(res, 'No se pudo procesar imagen y audio.');
+      const data = await parseJsonResponse(res, 'No se pudo procesar la imagen.');
 
       renderGeneratedPreview(data);
       showToast('Vista previa generada.');
@@ -364,12 +486,12 @@ function renderGeneratedPreview(data) {
   const genImg = $('generatedWebpImg');
   const genAudio = $('generatedAudioPlayer');
   const speakerBtn = $('playGeneratedAudioBtn');
+  const tapHint = document.querySelector('.tap-hint');
 
   genAudio.pause();
   speakerBtn.classList.remove('playing');
 
   genImg.src = `${data.webpUrl}${cacheBust}`;
-  genAudio.src = `${data.audioUrl}${cacheBust}`;
 
   $('outputEmptyState').classList.add('hidden');
   $('outputResultState').classList.remove('hidden');
@@ -379,7 +501,26 @@ function renderGeneratedPreview(data) {
   webpBadge.textContent = `${formatKB(data.webpSizeBytes)} / ${formatKB(data.limitBytes)}`;
   webpBadge.className = `size-badge ${data.withinLimit ? 'size-ok' : 'size-over'}`;
 
-  $('audioSizeBadge').textContent = `${formatKB(data.audioSizeBytes)} · ${data.durationSec}s`;
+  const dlWebp = $('downloadWebpLink');
+  const dlOgg = $('downloadOggLink');
+  dlWebp.href = `${data.webpUrl}?download=1`;
+  dlWebp.classList.remove('disabled-link');
+
+  if (data.hasAudio && data.audioUrl) {
+    genAudio.src = `${data.audioUrl}${cacheBust}`;
+    speakerBtn.classList.remove('hidden');
+    $('audioSizeBadge').textContent = `${formatKB(data.audioSizeBytes)} · ${data.durationSec}s`;
+    dlOgg.href = `${data.audioUrl}?download=1`;
+    dlOgg.classList.remove('disabled-link');
+    tapHint.textContent = 'Toca el sticker o el botón de audio para escuchar el sonido real (.ogg)';
+  } else {
+    genAudio.removeAttribute('src');
+    speakerBtn.classList.add('hidden');
+    $('audioSizeBadge').textContent = 'Sin audio (sticker normal)';
+    dlOgg.href = '#';
+    dlOgg.classList.add('disabled-link');
+    tapHint.textContent = 'Sticker normal sin audio (agrega un audio si quieres hacerlo Sound Sticker)';
+  }
 
   const appliedEl = $('appliedSettingsRow');
   const s = data.appliedSettings || {};
@@ -398,13 +539,6 @@ function renderGeneratedPreview(data) {
   } else {
     appliedEl.classList.add('hidden');
   }
-
-  const dlWebp = $('downloadWebpLink');
-  const dlOgg = $('downloadOggLink');
-  dlWebp.href = `${data.webpUrl}?download=1`;
-  dlOgg.href = `${data.audioUrl}?download=1`;
-  dlWebp.classList.remove('disabled-link');
-  dlOgg.classList.remove('disabled-link');
 
   updateSendButtonState();
 }
