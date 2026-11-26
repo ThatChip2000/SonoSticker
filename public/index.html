@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SonoSticker</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">🔊</div>
+        <div>
+          <h1>SonoSticker</h1>
+          <p class="subtitle">Creador local de stickers con audio para WhatsApp (512×512)</p>
+        </div>
+      </div>
+
+      <div class="wa-controls">
+        <span id="waStatusBadge" class="status-pill status-connecting">🟡 Conectando...</span>
+        <button id="openQrBtn" type="button" class="btn btn-secondary btn-sm hidden">
+          Ver QR
+        </button>
+        <button id="logoutBtn" type="button" class="btn btn-ghost btn-sm hidden">
+          Desvincular
+        </button>
+      </div>
+    </header>
+
+    <main class="studio-layout">
+      <section class="editor-panel card">
+        <div class="tabs" role="tablist">
+          <button
+            id="tabBtnVideo"
+            type="button"
+            class="tab-btn active"
+            role="tab"
+            aria-selected="true"
+            data-tab="video"
+          >
+            🎬 Video → Sticker animado (5 s)
+          </button>
+          <button
+            id="tabBtnImageAudio"
+            type="button"
+            class="tab-btn"
+            role="tab"
+            aria-selected="false"
+            data-tab="image-audio"
+          >
+            🖼️ Imagen + Audio (10 s)
+          </button>
+        </div>
+
+        <!-- TAB 1: VIDEO -->
+        <form id="videoForm" class="tab-panel active" data-panel="video">
+          <div id="videoDropzone" class="dropzone" tabindex="0">
+            <input
+              id="videoFileInput"
+              type="file"
+              accept=".mp4,.mov,.webm,.mkv,.avi,video/*"
+              hidden
+            />
+            <div class="dropzone-content">
+              <span class="dropzone-title">Arrastra tu video aquí o haz clic para elegir</span>
+              <span id="videoFileName" class="dropzone-hint">MP4, MOV, WebM, MKV (máx. 100 MB)</span>
+            </div>
+          </div>
+
+          <div id="videoEditorBody" class="editor-body hidden">
+            <div class="preview-stage-row">
+              <div class="square-frame checkerboard">
+                <video id="videoPlayer" controls playsinline></video>
+              </div>
+              <div class="trim-box">
+                <div class="field-group">
+                  <div class="field-header">
+                    <label for="videoStartRange">Inicio (s)</label>
+                    <button id="videoUseCurrentBtn" type="button" class="btn btn-secondary btn-xs">
+                      Usar tiempo actual
+                    </button>
+                  </div>
+                  <div class="range-number-row">
+                    <input id="videoStartRange" type="range" min="0" max="60" step="0.1" value="0" />
+                    <input id="videoStartNum" type="number" min="0" max="3600" step="0.1" value="0" />
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-header">
+                    <label for="videoDurationRange">Duración (s)</label>
+                    <span class="micro-note">Recomendado ≤ 5 s en animados</span>
+                  </div>
+                  <div class="range-number-row">
+                    <input id="videoDurationRange" type="range" min="0.5" max="10" step="0.1" value="5" />
+                    <input id="videoDurationNum" type="number" min="0.5" max="10" step="0.1" value="5" />
+                  </div>
+                  <div class="quick-pills" data-target="videoDuration">
+                    <button type="button" class="pill-btn" data-val="2">2s</button>
+                    <button type="button" class="pill-btn" data-val="3">3s</button>
+                    <button type="button" class="pill-btn active" data-val="5">5s</button>
+                    <button type="button" class="pill-btn" data-val="7">7s</button>
+                  </div>
+                </div>
+
+                <button id="videoLoopBtn" type="button" class="btn btn-secondary btn-sm full-width">
+                  ▶ Reproducir tramo en loop
+                </button>
+              </div>
+            </div>
+
+            <div class="controls-grid">
+              <div class="field-group">
+                <label for="videoFitMode">Encuadre 512×512</label>
+                <select id="videoFitMode">
+                  <option value="cover" selected>Recortar 1:1 (Cover)</option>
+                  <option value="contain">Ajustar con transparencia (Contain)</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <div class="field-header">
+                  <label for="videoFpsRange">FPS</label>
+                  <span id="videoFpsVal" class="value-tag">12 fps</span>
+                </div>
+                <input id="videoFpsRange" type="range" min="6" max="20" step="1" value="12" />
+              </div>
+
+              <div class="field-group">
+                <div class="field-header">
+                  <label for="videoQualityRange">Calidad WebP</label>
+                  <span id="videoQualityVal" class="value-tag">55%</span>
+                </div>
+                <input id="videoQualityRange" type="range" min="10" max="90" step="1" value="55" />
+              </div>
+
+              <div class="field-group">
+                <label for="videoAudioBitrate">Calidad Audio Opus</label>
+                <select id="videoAudioBitrate">
+                  <option value="12">12 kbps (ultraligero)</option>
+                  <option value="16">16 kbps (ligero)</option>
+                  <option value="24" selected>24 kbps (recomendado)</option>
+                  <option value="32">32 kbps (alta)</option>
+                  <option value="48">48 kbps (muy alta)</option>
+                  <option value="64">64 kbps (máxima)</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <div class="field-header">
+                  <label for="videoVolumeRange">Volumen</label>
+                  <span id="videoVolumeVal" class="value-tag">100%</span>
+                </div>
+                <input id="videoVolumeRange" type="range" min="50" max="200" step="5" value="100" />
+              </div>
+
+              <div class="field-group checkbox-group">
+                <label class="checkbox-label">
+                  <input id="videoAutoFit" type="checkbox" checked />
+                  <span>Auto-comprimir si supera 500 KB</span>
+                </label>
+              </div>
+            </div>
+
+            <button id="videoGenerateBtn" type="submit" class="btn btn-primary btn-lg full-width">
+              Generar vista previa y calcular peso
+            </button>
+          </div>
+        </form>
+
+        <!-- TAB 2: IMAGE + AUDIO -->
+        <form id="imageAudioForm" class="tab-panel" data-panel="image-audio">
+          <div class="dual-dropzones">
+            <div id="imageDropzone" class="dropzone" tabindex="0">
+              <input
+                id="imageFileInput"
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,image/*"
+                hidden
+              />
+              <div class="dropzone-content">
+                <span class="dropzone-title">1. Imagen estática</span>
+                <span id="imageFileName" class="dropzone-hint">PNG (con transparencia), JPG o WebP</span>
+              </div>
+            </div>
+
+            <div id="audioDropzone" class="dropzone" tabindex="0">
+              <input
+                id="audioFileInput"
+                type="file"
+                accept=".mp3,.wav,.ogg,.m4a,.aac,.flac,.mp4,.webm,.mov,audio/*,video/*"
+                hidden
+              />
+              <div class="dropzone-content">
+                <span class="dropzone-title">2. Audio o Video (extrae solo el sonido)</span>
+                <span id="audioFileName" class="dropzone-hint">MP3, WAV, OGG, M4A o MP4/WebM/MOV</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="preview-stage-row">
+            <div class="square-frame checkerboard">
+              <img id="staticImagePreview" class="hidden contain-fit" alt="Vista previa de imagen" />
+              <div id="staticImagePlaceholder" class="frame-placeholder">Sube una imagen</div>
+            </div>
+
+            <div class="trim-box">
+              <audio id="audioPlayer" controls class="full-width"></audio>
+
+              <div class="field-group">
+                <div class="field-header">
+                  <label for="audioStartRange">Inicio del audio (s)</label>
+                  <button id="audioUseCurrentBtn" type="button" class="btn btn-secondary btn-xs">
+                    Usar tiempo actual
+                  </button>
+                </div>
+                <div class="range-number-row">
+                  <input id="audioStartRange" type="range" min="0" max="60" step="0.1" value="0" />
+                  <input id="audioStartNum" type="number" min="0" max="3600" step="0.1" value="0" />
+                </div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-header">
+                  <label for="audioDurationRange">Duración (s)</label>
+                  <span class="micro-note">Hasta 10 s en estáticos</span>
+                </div>
+                <div class="range-number-row">
+                  <input id="audioDurationRange" type="range" min="0.5" max="10" step="0.1" value="5" />
+                  <input id="audioDurationNum" type="number" min="0.5" max="10" step="0.1" value="5" />
+                </div>
+                <div class="quick-pills" data-target="audioDuration">
+                  <button type="button" class="pill-btn" data-val="3">3s</button>
+                  <button type="button" class="pill-btn active" data-val="5">5s</button>
+                  <button type="button" class="pill-btn" data-val="8">8s</button>
+                  <button type="button" class="pill-btn" data-val="10">10s</button>
+                </div>
+              </div>
+
+              <button id="audioLoopBtn" type="button" class="btn btn-secondary btn-sm full-width">
+                ▶ Reproducir tramo en loop
+              </button>
+            </div>
+          </div>
+
+          <div class="controls-grid">
+            <div class="field-group">
+              <label for="staticFitMode">Encuadre 512×512</label>
+              <select id="staticFitMode">
+                <option value="contain" selected>Ajustar con transparencia (Contain)</option>
+                <option value="cover">Recortar 1:1 (Cover)</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <div class="field-header">
+                <label for="staticQualityRange">Calidad WebP</label>
+                <span id="staticQualityVal" class="value-tag">75%</span>
+              </div>
+              <input id="staticQualityRange" type="range" min="10" max="95" step="1" value="75" />
+            </div>
+
+            <div class="field-group">
+              <label for="staticAudioBitrate">Bitrate Audio Opus</label>
+              <select id="staticAudioBitrate">
+                <option value="12">12 kbps (ultraligero)</option>
+                <option value="16">16 kbps (ligero)</option>
+                <option value="24" selected>24 kbps (recomendado)</option>
+                <option value="32">32 kbps (alta)</option>
+                <option value="48">48 kbps (muy alta)</option>
+                <option value="64">64 kbps (máxima)</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <div class="field-header">
+                <label for="staticVolumeRange">Volumen</label>
+                <span id="staticVolumeVal" class="value-tag">100%</span>
+              </div>
+              <input id="staticVolumeRange" type="range" min="50" max="200" step="5" value="100" />
+            </div>
+
+            <div class="field-group checkbox-group span-2">
+              <label class="checkbox-label">
+                <input id="staticAutoFit" type="checkbox" checked />
+                <span>Auto-comprimir si supera 100 KB</span>
+              </label>
+            </div>
+          </div>
+
+          <button id="staticGenerateBtn" type="submit" class="btn btn-primary btn-lg full-width">
+            Generar vista previa y calcular peso
+          </button>
+        </form>
+      </section>
+
+      <!-- RIGHT PANEL: OUTPUT & SEND -->
+      <aside class="output-panel card">
+        <h2>Vista previa en WhatsApp</h2>
+
+        <div class="wa-chat-mockup">
+          <div id="outputEmptyState" class="output-empty">
+            Genera una vista previa desde cualquiera de los dos módulos para probar el sticker,
+            revisar su peso exacto en KB y enviarlo a WhatsApp.
+          </div>
+
+          <div id="outputResultState" class="output-result hidden">
+            <div class="wa-sticker-bubble" id="waStickerBubble" title="Haz clic para reproducir el sonido">
+              <img id="generatedWebpImg" alt="Sticker generado" />
+              <button
+                id="playGeneratedAudioBtn"
+                type="button"
+                class="speaker-badge"
+                aria-label="Reproducir o detener sonido del sticker"
+              >
+                🔊
+              </button>
+            </div>
+            <audio id="generatedAudioPlayer" class="hidden"></audio>
+            <p class="tap-hint">Toca el sticker o el ícono 🔊 para escuchar el audio real (.ogg)</p>
+          </div>
+        </div>
+
+        <div id="metricsBox" class="metrics-box hidden">
+          <div class="metric-row">
+            <span>Sticker .webp</span>
+            <span id="webpSizeBadge" class="size-badge">-</span>
+          </div>
+          <div class="metric-row">
+            <span>Audio .ogg (Opus)</span>
+            <span id="audioSizeBadge" class="size-badge size-neutral">-</span>
+          </div>
+          <div id="appliedSettingsRow" class="applied-settings hidden"></div>
+        </div>
+
+        <div class="send-box">
+          <h3>Destino</h3>
+          <div class="radio-group">
+            <label class="radio-pill">
+              <input type="radio" name="recipientMode" value="self" checked />
+              <span>Mi chat (Tú)</span>
+            </label>
+            <label class="radio-pill">
+              <input type="radio" name="recipientMode" value="custom" />
+              <span>Otro número</span>
+            </label>
+          </div>
+
+          <div id="customRecipientWrap" class="field-group hidden">
+            <label for="customRecipientInput">Número con código de país (sin +)</label>
+            <input
+              id="customRecipientInput"
+              type="text"
+              placeholder="Ej. 56912345678"
+              autocomplete="off"
+            />
+          </div>
+
+          <button id="sendWaBtn" type="button" class="btn btn-primary btn-lg full-width" disabled>
+            Enviar a WhatsApp
+          </button>
+
+          <div class="download-row">
+            <a id="downloadWebpLink" class="btn btn-secondary btn-sm disabled-link" href="#" download>
+              Descargar .webp
+            </a>
+            <a id="downloadOggLink" class="btn btn-secondary btn-sm disabled-link" href="#" download>
+              Descargar .ogg
+            </a>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- QR MODAL -->
+    <div id="qrModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="qrModalTitle">Vincular WhatsApp</h3>
+          <button id="closeQrBtn" type="button" class="btn btn-ghost btn-sm">✕</button>
+        </div>
+        <p class="modal-desc">
+          Abre WhatsApp en tu celular → <strong>Dispositivos vinculados</strong> →
+          <strong>Vincular un dispositivo</strong> y escanea este código QR:
+        </p>
+        <div class="qr-box">
+          <img id="qrImage" alt="Código QR de WhatsApp" />
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
