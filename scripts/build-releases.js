@@ -9,7 +9,6 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist-release');
 
 const PRODUCTION_ROOT_FILES = [
-  'package.json',
   'package-lock.json',
   'LICENSE',
   'README.md',
@@ -48,6 +47,16 @@ async function copyAppFiles(targetDir, { portable }) {
   for (const file of PRODUCTION_ROOT_FILES) {
     await fs.copyFile(path.join(rootDir, file), path.join(targetDir, file));
   }
+  const pkg = JSON.parse(await fs.readFile(path.join(rootDir, 'package.json'), 'utf8'));
+  const cleanPkg = {
+    ...pkg,
+    scripts: {
+      start: pkg.scripts?.start || 'node src/server.js',
+      dev: pkg.scripts?.dev || 'node --watch src/server.js',
+    },
+  };
+  await fs.writeFile(path.join(targetDir, 'package.json'), `${JSON.stringify(cleanPkg, null, 2)}\n`, 'utf8');
+
   for (const srcFile of PRODUCTION_SRC_FILES) {
     await fs.copyFile(path.join(rootDir, srcFile), path.join(targetDir, srcFile));
   }

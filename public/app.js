@@ -117,11 +117,30 @@ function getLoopMediaEl(kind) {
   return $('audioPlayer');
 }
 
-function stopSegmentLoop(kind) {
+function getLoopButtonInfo(kind) {
+  if (kind === 'video') {
+    return { btnId: 'videoLoopBtn', label: 'Reproducir tramo en loop' };
+  }
+  if (kind === 'customAudio') {
+    return { btnId: 'videoCustomAudioLoopBtn', label: 'Reproducir tramo de audio en loop' };
+  }
+  return { btnId: 'audioLoopBtn', label: 'Reproducir tramo en loop' };
+}
+
+function stopSegmentLoop(kind, { pauseMedia = false } = {}) {
   const mediaEl = getLoopMediaEl(kind);
-  if (state.loopMonitor[kind]) {
-    mediaEl.removeEventListener('timeupdate', state.loopMonitor[kind]);
+  const monitor = state.loopMonitor[kind];
+  if (monitor) {
+    mediaEl.removeEventListener('timeupdate', monitor.onTimeUpdate);
+    mediaEl.removeEventListener('ended', monitor.onEnded);
+    mediaEl.removeEventListener('pause', monitor.onPause);
     state.loopMonitor[kind] = null;
+  }
+  const { btnId, label } = getLoopButtonInfo(kind);
+  const btn = $(btnId);
+  if (btn) btn.textContent = label;
+  if (pauseMedia) {
+    mediaEl.pause();
   }
 }
 
@@ -131,18 +150,44 @@ function playSegmentLoop(kind, startSec, durationSec) {
     showToast('Primero carga un archivo para reproducir el tramo.', 'error');
     return;
   }
-  stopSegmentLoop(kind);
+
+  if (state.loopMonitor[kind]) {
+    stopSegmentLoop(kind, { pauseMedia: true });
+    return;
+  }
 
   const start = Math.max(0, Number(startSec) || 0);
-  const end = start + Math.max(0.5, Number(durationSec) || 1);
+  const dur = Math.max(0.5, Number(durationSec) || 1);
+  let end = start + dur;
+  if (Number.isFinite(mediaEl.duration) && mediaEl.duration > 0) {
+    end = Math.min(end, Math.max(start + 0.1, mediaEl.duration - 0.05));
+  }
 
   const onTimeUpdate = () => {
-    if (mediaEl.currentTime >= end || mediaEl.currentTime < start - 0.15) {
+    if (mediaEl.currentTime >= end || mediaEl.currentTime < start - 0.2) {
       mediaEl.currentTime = start;
     }
   };
-  state.loopMonitor[kind] = onTimeUpdate;
+  const onEnded = () => {
+    if (!state.loopMonitor[kind]) return;
+    mediaEl.currentTime = start;
+    mediaEl.play().catch(() => {});
+  };
+  const onPause = () => {
+    if (!mediaEl.ended) {
+      stopSegmentLoop(kind);
+    }
+  };
+
+  state.loopMonitor[kind] = { onTimeUpdate, onEnded, onPause };
   mediaEl.addEventListener('timeupdate', onTimeUpdate);
+  mediaEl.addEventListener('ended', onEnded);
+  mediaEl.addEventListener('pause', onPause);
+
+  const { btnId } = getLoopButtonInfo(kind);
+  const btn = $(btnId);
+  if (btn) btn.textContent = 'Detener loop';
+
   mediaEl.currentTime = start;
   mediaEl.play().catch(() => {});
 }
@@ -215,12 +260,33 @@ function setupVideoTab() {
   syncFitClass();
   fitSelect.addEventListener('change', syncFitClass);
 
+  const clearCustomAudio = () => {
+    stopSegmentLoop('customAudio');
+    state.videoCustomAudioFile = null;
+    $('videoCustomAudioInput').value = '';
+    if (state.videoCustomAudioObjectUrl) {
+      URL.revokeObjectURL(state.videoCustomAudioObjectUrl);
+      state.videoCustomAudioObjectUrl = null;
+    }
+    customAudioPlayer.pause();
+    customAudioPlayer.removeAttribute('src');
+    $('videoCustomAudioName').textContent = 'Haz clic o arrastra un audio distinto (opcional)';
+    $('videoCustomAudioControls').classList.add('hidden');
+    $('clearVideoCustomAudioBtn').classList.add('hidden');
+    if (!state.videoIsGif) {
+      $('videoMuteOriginalWrap').classList.remove('hidden');
+    }
+  };
+
   setupDropzone($('videoDropzone'), $('videoFileInput'), (file) => {
     stopSegmentLoop('video');
     state.videoFile = file;
     state.videoIsGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
     $('videoFileName').textContent = `${file.name} (${formatKB(file.size)})`;
     $('videoMuteOriginal').checked = false;
+    if (!state.videoIsGif && state.videoCustomAudioFile) {
+      clearCustomAudio();
+    }
     if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
     state.videoObjectUrl = URL.createObjectURL(file);
 
@@ -271,24 +337,6 @@ function setupVideoTab() {
   $('videoLoopBtn').addEventListener('click', () => {
     playSegmentLoop('video', startNum.value, durNum.value);
   });
-
-  const clearCustomAudio = () => {
-    stopSegmentLoop('customAudio');
-    state.videoCustomAudioFile = null;
-    $('videoCustomAudioInput').value = '';
-    if (state.videoCustomAudioObjectUrl) {
-      URL.revokeObjectURL(state.videoCustomAudioObjectUrl);
-      state.videoCustomAudioObjectUrl = null;
-    }
-    customAudioPlayer.pause();
-    customAudioPlayer.removeAttribute('src');
-    $('videoCustomAudioName').textContent = 'Haz clic o arrastra un audio distinto (opcional)';
-    $('videoCustomAudioControls').classList.add('hidden');
-    $('clearVideoCustomAudioBtn').classList.add('hidden');
-    if (!state.videoIsGif) {
-      $('videoMuteOriginalWrap').classList.remove('hidden');
-    }
-  };
 
   $('clearVideoCustomAudioBtn').addEventListener('click', clearCustomAudio);
 

@@ -28,6 +28,7 @@ class WhatsAppService {
     this.starting = false;
     this.manualLogout = false;
     this.reconnectTimer = null;
+    this.sessionToken = 0;
     this.state = {
       status: 'disconnected',
       qrDataUrl: null,
@@ -49,6 +50,7 @@ class WhatsAppService {
     if (this.starting || this.state.status === 'open') {
       return;
     }
+    const token = ++this.sessionToken;
     this.starting = true;
     this.manualLogout = false;
     this.state.status = 'connecting';
@@ -57,6 +59,10 @@ class WhatsAppService {
     try {
       const { state, saveCreds } = await useMultiFileAuthState(authDir);
       const { version } = await fetchLatestBaileysVersion();
+
+      if (token !== this.sessionToken || this.manualLogout) {
+        return;
+      }
 
       const sock = makeWASocket({
         version,
@@ -136,10 +142,14 @@ class WhatsAppService {
         }
       });
     } catch (err) {
-      this.state.status = 'disconnected';
-      this.state.lastError = err.message;
+      if (token === this.sessionToken) {
+        this.state.status = 'disconnected';
+        this.state.lastError = err.message;
+      }
     } finally {
-      this.starting = false;
+      if (token === this.sessionToken) {
+        this.starting = false;
+      }
     }
   }
 
@@ -221,6 +231,8 @@ class WhatsAppService {
 
   async logout() {
     this.manualLogout = true;
+    this.sessionToken++;
+    this.starting = false;
     clearTimeout(this.reconnectTimer);
 
     if (this.sock) {
