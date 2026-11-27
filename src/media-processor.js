@@ -161,9 +161,9 @@ function resolveTrimSegment(totalDurationSec, rawStart, rawDuration, fallbackDur
     );
   }
   let durationSec = clamp(rawDuration, 0.5, 10, fallbackDuration);
-  if (totalDurationSec != null && totalDurationSec > startSec + 0.2) {
+  if (totalDurationSec != null && totalDurationSec > startSec) {
     const remaining = Number((totalDurationSec - startSec).toFixed(2));
-    if (remaining >= 0.5) {
+    if (remaining > 0) {
       durationSec = Math.min(durationSec, remaining);
     }
   }
@@ -203,10 +203,10 @@ export async function processVideoToSoundSticker(inputPath, outputDir, options =
 
   const encodeAnimatedWebp = async (targetFps, targetQuality) => {
     const vf = buildSquareScaleFilter(fitMode, targetFps);
+    const seekArgs = startSec > 0 ? ['-ss', String(startSec)] : [];
     await runFfmpeg([
       '-y',
-      '-ss',
-      String(startSec),
+      ...seekArgs,
       '-i',
       inputPath,
       '-t',

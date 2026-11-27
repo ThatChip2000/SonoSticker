@@ -34,23 +34,17 @@ if errorlevel 2 (
 echo.
 
 where winget >nul 2>nul
-if errorlevel 1 goto install_msi
+if errorlevel 1 goto manual_node_download
 
 echo Instalando Node.js LTS mediante winget...
 winget install -e --id OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
 call :find_node
 if defined NODE_FOUND goto verify_after_install
 
-:install_msi
+:manual_node_download
 echo.
-echo Descargando instalador oficial de Node.js LTS...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; $lts=$null; foreach($x in (Invoke-RestMethod 'https://nodejs.org/dist/index.json')){ if($x.lts -is [string]){ $lts=$x; break } }; if(-not $lts){ exit 1 }; $arch=if([Environment]::Is64BitOperatingSystem){'x64'}else{'x86'}; $url='https://nodejs.org/dist/'+$lts.version+'/node-'+$lts.version+'-'+$arch+'.msi'; $out=Join-Path $env:TEMP ('node-'+$lts.version+'.msi'); Write-Host ('Descargando '+$url+'...'); (New-Object Net.WebClient).DownloadFile($url,$out); $p=Start-Process msiexec.exe -ArgumentList @('/i',$out,'/passive') -Wait -PassThru; Remove-Item $out -Force -ErrorAction SilentlyContinue; exit $p.ExitCode"
-call :find_node
-if defined NODE_FOUND goto verify_after_install
-
-echo.
-echo [ERROR] No se pudo instalar Node.js automaticamente.
-echo Abriendo https://nodejs.org/ para descarga manual...
+echo [AVISO] No se pudo instalar Node.js automaticamente ^(winget no disponible o cancelado^).
+echo Abriendo https://nodejs.org/ para que descargues el instalador LTS...
 start "" "https://nodejs.org/"
 pause
 exit /b 1

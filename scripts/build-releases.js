@@ -8,9 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist-release');
 
-const ALLOWLIST_FILES = [
-  'Abrir SonoSticker.bat',
-  'abrir-sonosticker.sh',
+const PRODUCTION_ROOT_FILES = [
   'package.json',
   'package-lock.json',
   'LICENSE',
@@ -18,20 +16,54 @@ const ALLOWLIST_FILES = [
   '.gitignore',
 ];
 
-const ALLOWLIST_DIRS = ['public', 'src', 'scripts'];
+const PRODUCTION_SRC_FILES = [
+  'src/server.js',
+  'src/media-processor.js',
+  'src/whatsapp-service.js',
+  'src/sound-sticker-proto.js',
+];
+
+const PORTABLE_LAUNCHER_BAT = [
+  '@echo off',
+  'chcp 65001 >nul',
+  'title SonoSticker',
+  'cd /d "%~dp0"',
+  'echo Iniciando SonoSticker... ^(se abrira el navegador automaticamente^)',
+  '"%~dp0runtime\\node.exe" "%~dp0src\\server.js"',
+  'if errorlevel 1 (',
+  '  echo.',
+  '  echo [ERROR] SonoSticker se detuvo con un error.',
+  '  pause',
+  ')',
+  '',
+].join('\r\n');
 
 function run(cmd, args, cwd = rootDir) {
   execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 }
 
-async function copyAppFiles(targetDir) {
-  await fs.mkdir(targetDir, { recursive: true });
+async function copyAppFiles(targetDir, { portable }) {
+  await fs.mkdir(path.join(targetDir, 'src'), { recursive: true });
 
-  for (const file of ALLOWLIST_FILES) {
+  for (const file of PRODUCTION_ROOT_FILES) {
     await fs.copyFile(path.join(rootDir, file), path.join(targetDir, file));
   }
-  for (const dir of ALLOWLIST_DIRS) {
-    await fs.cp(path.join(rootDir, dir), path.join(targetDir, dir), { recursive: true });
+  for (const srcFile of PRODUCTION_SRC_FILES) {
+    await fs.copyFile(path.join(rootDir, srcFile), path.join(targetDir, srcFile));
+  }
+  await fs.cp(path.join(rootDir, 'public'), path.join(targetDir, 'public'), { recursive: true });
+
+  if (portable) {
+    await fs.writeFile(path.join(targetDir, 'Abrir SonoSticker.bat'), PORTABLE_LAUNCHER_BAT, 'utf8');
+  } else {
+    await fs.copyFile(
+      path.join(rootDir, 'Abrir SonoSticker.bat'),
+      path.join(targetDir, 'Abrir SonoSticker.bat')
+    );
+    await fs.copyFile(
+      path.join(rootDir, 'abrir-sonosticker.sh'),
+      path.join(targetDir, 'abrir-sonosticker.sh')
+    );
   }
 }
 
@@ -71,6 +103,16 @@ function zipFolder(sourceFolder, zipPath) {
   );
 }
 
+async function assertPortableLauncherClean(portableDir) {
+  const batText = await fs.readFile(path.join(portableDir, 'Abrir SonoSticker.bat'), 'utf8');
+  for (const forbidden of ['powershell', 'ExecutionPolicy', 'DownloadFile', 'msiexec', 'winget']) {
+    assert.ok(
+      !batText.toLowerCase().includes(forbidden.toLowerCase()),
+      `Portable launcher contiene patron no permitido: ${forbidden}`
+    );
+  }
+}
+
 function assertZipClean(zipPath) {
   const out = execFileSync(
     'powershell',
@@ -86,11 +128,11 @@ function assertZipClean(zipPath) {
 
   const lines = out.split(/\r?\n/).filter(Boolean);
   const bad = lines.filter((line) =>
-    /(^|\/)(auth_info|captured-sticker\.json|tmp-uploads|tmp-previews|test-assets|\.git)(\/|$)/i.test(
+    /(^|\/)(auth_info|captured-sticker\.json|tmp-uploads|tmp-previews|test-assets|scripts|\.git)(\/|$)|(^|\/)src\/poc\.js$/i.test(
       line
     )
   );
-  assert.equal(bad.length, 0, `Archivos sensibles detectados en ${zipPath}: ${bad.join(', ')}`);
+  assert.equal(bad.length, 0, `Archivos no permitidos detectados en ${zipPath}: ${bad.join(', ')}`);
   console.log(`[OK] ZIP verificado (${lines.length} entradas): ${zipPath}`);
 }
 
@@ -100,6 +142,7 @@ async function smokeTestPortable(portableDir) {
 
   await fs.access(runtimeNode);
   await fs.access(ffmpegExe);
+  await assertPortableLauncherClean(portableDir);
 
   execFileSync(
     runtimeNode,
@@ -144,8 +187,8 @@ async function main() {
   const portableStaging = path.join(distDir, 'portable', 'SonoSticker-Portable');
 
   console.log('[INFO] Copiando archivos limpios...');
-  await copyAppFiles(ligeroStaging);
-  await copyAppFiles(portableStaging);
+  await copyAppFiles(ligeroStaging, { portable: false });
+  await copyAppFiles(portableStaging, { portable: true });
 
   const ltsVersion = await resolveLatestLtsNodeVersion();
   const nodeZipName = `node-${ltsVersion}-win-x64.zip`;

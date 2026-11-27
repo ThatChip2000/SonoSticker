@@ -72,6 +72,7 @@ function setupDropzone(zoneEl, inputEl, onFile) {
   });
   inputEl.addEventListener('change', () => {
     const file = inputEl.files?.[0];
+    inputEl.value = '';
     if (file) onFile(file);
   });
 }
@@ -153,6 +154,14 @@ function setupTabs() {
     btn.addEventListener('click', () => {
       const target = btn.dataset.tab;
       state.activeTab = target;
+
+      stopSegmentLoop('video');
+      stopSegmentLoop('customAudio');
+      stopSegmentLoop('audio');
+      $('videoPlayer').pause();
+      $('videoCustomAudioPlayer').pause();
+      $('audioPlayer').pause();
+
       for (const b of tabBtns) {
         const active = b.dataset.tab === target;
         b.classList.toggle('active', active);
@@ -211,6 +220,7 @@ function setupVideoTab() {
     state.videoFile = file;
     state.videoIsGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
     $('videoFileName').textContent = `${file.name} (${formatKB(file.size)})`;
+    $('videoMuteOriginal').checked = false;
     if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
     state.videoObjectUrl = URL.createObjectURL(file);
 
@@ -220,6 +230,7 @@ function setupVideoTab() {
       player.classList.add('hidden');
       gifPlayer.src = state.videoObjectUrl;
       gifPlayer.classList.remove('hidden');
+      $('videoStartGroup').classList.add('hidden');
       $('videoUseCurrentBtn').classList.add('hidden');
       $('videoLoopBtn').classList.add('hidden');
       $('videoMuteOriginalWrap').classList.add('hidden');
@@ -230,6 +241,7 @@ function setupVideoTab() {
       gifPlayer.classList.add('hidden');
       player.src = state.videoObjectUrl;
       player.classList.remove('hidden');
+      $('videoStartGroup').classList.remove('hidden');
       $('videoUseCurrentBtn').classList.remove('hidden');
       $('videoLoopBtn').classList.remove('hidden');
       $('videoMuteOriginalWrap').classList.toggle('hidden', Boolean(state.videoCustomAudioFile));
